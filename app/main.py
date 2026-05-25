@@ -74,7 +74,7 @@ def _save_todos(todos):
 def get_config():
     return {
         "dozzle_url": os.getenv("DOZZLE_URL", "http://localhost:9999"),
-        "hostname": "station",
+        "hostname": os.getenv("HOSTNAME_DISPLAY", os.uname().nodename),
     }
 
 

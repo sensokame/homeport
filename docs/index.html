@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>station — lightweight Docker dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --blue: #58a6ff;
+      --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 72px 0 56px;
+      text-align: center;
+    }
+
+    .hero-name {
+      font-family: var(--mono);
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      color: var(--text);
+    }
+
+    .hero-tagline {
+      margin-top: 12px;
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-actions {
+      margin-top: 28px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--muted); background: #1c2128; text-decoration: none; }
+    .btn-primary { background: var(--blue); color: #0d1117; border-color: var(--blue); font-weight: 600; }
+    .btn-primary:hover { background: #79c0ff; border-color: #79c0ff; }
+
+    /* Screenshot */
+    .screenshot {
+      margin: 0 0 64px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .screenshot img {
+      width: 100%;
+      display: block;
+    }
+
+    .screenshot-placeholder {
+      padding: 64px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      font-family: var(--mono);
+    }
+
+    /* Features */
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 64px;
+    }
+
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+
+    .feature-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+
+    .feature-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Deploy */
+    .deploy { margin-bottom: 64px; }
+
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+
+    .comment { color: var(--muted); }
+
+    /* Stack */
+    .stack { margin-bottom: 64px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    td:first-child { font-family: var(--mono); font-size: 13px; color: var(--muted); width: 100px; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 540px) {
+      .hero-name { font-size: 36px; }
+      .hero-tagline { font-size: 16px; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <section class="hero">
+      <div class="hero-name">station</div>
+      <p class="hero-tagline">Lightweight Docker control panel for your home server. No framework, no build step.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/sensokame/station-dashboard">View on GitHub</a>
+        <a class="btn" href="https://github.com/sensokame/station-dashboard#deploy">Deploy →</a>
+      </div>
+    </section>
+
+    <div class="screenshot">
+      <div class="screenshot-placeholder">screenshot coming soon</div>
+    </div>
+
+    <p class="section-title">Features</p>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-title">container cards</div>
+        <div class="feature-desc">Live status, uptime, CPU and RAM per container. Stop, restart, and start in one click.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-title">system metrics</div>
+        <div class="feature-desc">CPU, RAM, and disk usage bars — updated every 5 seconds.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-title">update all</div>
+        <div class="feature-desc">Pulls latest images for every container, restarts only those that changed.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-title">no build step</div>
+        <div class="feature-desc">Vanilla JS and CSS. Static files reload on save — no bundler, no framework.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-title">detail view</div>
+        <div class="feature-desc">Image, ports, mounts, networks, live stats, and deep link to Dozzle logs.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-title">mobile friendly</div>
+        <div class="feature-desc">Responsive layout — works on phones and tablets without a separate view.</div>
+      </div>
+    </div>
+
+    <div class="deploy">
+      <p class="section-title">Deploy</p>
+      <pre><span class="comment"># docker-compose.yml</span>
+services:
+  dashboard:
+    build: ./app
+    container_name: dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./app/static:/app/static:ro
+      - ./data:/data
+    environment:
+      - DOZZLE_URL=http://your-host:9999
+      - CONTAINER_NAME=dashboard
+      - HOSTNAME_DISPLAY=station</pre>
+    </div>
+
+    <div class="stack">
+      <p class="section-title">Stack</p>
+      <table>
+        <tr><th>Layer</th><th>Tech</th></tr>
+        <tr><td>backend</td><td>FastAPI, Docker SDK for Python, psutil</td></tr>
+        <tr><td>frontend</td><td>Vanilla JS, CSS custom properties, hash routing</td></tr>
+        <tr><td>container</td><td>Python 3.11-slim</td></tr>
+      </table>
+    </div>
+
+    <footer>
+      MIT License &nbsp;·&nbsp; <a href="https://github.com/sensokame/station-dashboard">github.com/sensokame/station-dashboard</a>
+    </footer>
+
+  </div>
+</body>
+</html>

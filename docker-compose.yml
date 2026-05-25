@@ -10,8 +10,9 @@ services:
       - ./app/static:/app/static:ro
       - ./data:/data
     environment:
-      - DOZZLE_URL=http://station:9999
-      - CONTAINER_NAME=dashboard
+      - DOZZLE_URL=http://your-host:9999   # URL of your Dozzle instance
+      - CONTAINER_NAME=dashboard            # must match the container_name above
+      - HOSTNAME_DISPLAY=station            # label shown in the top bar
     networks:
       - proxy-network
 
