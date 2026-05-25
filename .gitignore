@@ -1,0 +1,11 @@
+# Runtime data
+data/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Editor
+.vscode/
+.idea/
+*.swp

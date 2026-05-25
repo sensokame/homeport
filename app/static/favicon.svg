@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- dark background -->
+  <rect width="32" height="32" rx="6" fill="#161b22"/>
+  <!-- server rack outline -->
+  <rect x="6" y="7" width="20" height="5" rx="1.5" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+  <rect x="6" y="14" width="20" height="5" rx="1.5" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+  <rect x="6" y="21" width="20" height="5" rx="1.5" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+  <!-- status dots on each rack unit -->
+  <circle cx="23" cy="9.5" r="1.5" fill="#3fb950"/>
+  <circle cx="23" cy="16.5" r="1.5" fill="#3fb950"/>
+  <circle cx="23" cy="23.5" r="1.5" fill="#f85149"/>
+</svg>

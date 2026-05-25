@@ -1,0 +1,20 @@
+services:
+  dashboard:
+    build: ./app
+    container_name: dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./app/static:/app/static:ro
+      - ./data:/data
+    environment:
+      - DOZZLE_URL=http://station:9999
+      - CONTAINER_NAME=dashboard
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
