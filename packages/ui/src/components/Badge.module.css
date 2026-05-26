@@ -1,0 +1,14 @@
+.badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ok      { background: rgba(63, 185, 80, 0.15);  color: var(--color-ok); }
+.warn    { background: rgba(227, 179, 65, 0.15); color: var(--color-warn); }
+.error   { background: rgba(248, 81, 73, 0.15);  color: var(--color-error); }
+.default { background: var(--color-border);       color: var(--color-muted); }
