@@ -1,0 +1,27 @@
+[
+  {
+    "id": "infra",
+    "name": "Infrastructure",
+    "url": "http://infra.station",
+    "widget_url": "http://infra:8080/widget",
+    "icon": "server"
+  },
+  {
+    "id": "quartz",
+    "name": "Notes",
+    "url": "http://quartz.station",
+    "icon": "book"
+  },
+  {
+    "id": "vikunja",
+    "name": "Tasks",
+    "url": "http://vikunja.station",
+    "icon": "check-square"
+  },
+  {
+    "id": "budget",
+    "name": "Finances",
+    "url": "http://budget.station",
+    "icon": "dollar-sign"
+  }
+]

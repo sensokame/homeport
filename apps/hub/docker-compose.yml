@@ -1,0 +1,17 @@
+services:
+  hub:
+    build:
+      context: ../..
+      dockerfile: apps/hub/Dockerfile
+    container_name: hub
+    restart: unless-stopped
+    volumes:
+      - ./satellites.json:/app/satellites.json:ro
+    environment:
+      - HOSTNAME_DISPLAY=station
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
