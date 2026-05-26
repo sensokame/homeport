@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>station — lightweight Docker dashboard</title>
+  <title>homeport — self-hosted personal hub</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -35,7 +35,6 @@
       padding: 0 24px;
     }
 
-    /* Hero */
     .hero {
       padding: 72px 0 56px;
       text-align: center;
@@ -53,7 +52,7 @@
       margin-top: 12px;
       font-size: 18px;
       color: var(--muted);
-      max-width: 480px;
+      max-width: 520px;
       margin-left: auto;
       margin-right: auto;
     }
@@ -81,18 +80,12 @@
     .btn-primary { background: var(--blue); color: #0d1117; border-color: var(--blue); font-weight: 600; }
     .btn-primary:hover { background: #79c0ff; border-color: #79c0ff; }
 
-    /* Screenshot */
     .screenshot {
       margin: 0 0 64px;
       border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
       background: var(--surface);
-    }
-
-    .screenshot img {
-      width: 100%;
-      display: block;
     }
 
     .screenshot-placeholder {
@@ -103,7 +96,6 @@
       font-family: var(--mono);
     }
 
-    /* Features */
     .section-title {
       font-size: 13px;
       font-weight: 600;
@@ -111,6 +103,26 @@
       letter-spacing: 0.6px;
       color: var(--muted);
       margin-bottom: 20px;
+    }
+
+    .arch {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin-bottom: 64px;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .arch p { margin-bottom: 12px; color: var(--text); }
+    .arch p:last-child { margin-bottom: 0; }
+
+    .arch .label {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--green);
     }
 
     .features {
@@ -141,9 +153,6 @@
       line-height: 1.5;
     }
 
-    /* Deploy */
-    .deploy { margin-bottom: 64px; }
-
     pre {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -154,11 +163,11 @@
       color: var(--text);
       overflow-x: auto;
       line-height: 1.6;
+      margin-bottom: 64px;
     }
 
     .comment { color: var(--muted); }
 
-    /* Stack */
     .stack { margin-bottom: 64px; }
 
     table {
@@ -181,9 +190,8 @@
       color: var(--muted);
     }
 
-    td:first-child { font-family: var(--mono); font-size: 13px; color: var(--muted); width: 100px; }
+    td:first-child { font-family: var(--mono); font-size: 13px; color: var(--muted); width: 120px; }
 
-    /* Footer */
     footer {
       border-top: 1px solid var(--border);
       padding: 28px 0;
@@ -203,11 +211,11 @@
   <div class="container">
 
     <section class="hero">
-      <div class="hero-name">station</div>
-      <p class="hero-tagline">Lightweight Docker control panel for your home server. No framework, no build step.</p>
+      <div class="hero-name">homeport</div>
+      <p class="hero-tagline">A self-hosted personal hub. Aggregates independent satellite services into one dashboard — no lock-in, no domain logic.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/sensokame/station-dashboard">View on GitHub</a>
-        <a class="btn" href="https://github.com/sensokame/station-dashboard#deploy">Deploy →</a>
+        <a class="btn btn-primary" href="https://github.com/sensokame/homeport">View on GitHub</a>
+        <a class="btn" href="https://github.com/sensokame/homeport#deploy">Deploy →</a>
       </div>
     </section>
 
@@ -215,66 +223,72 @@
       <div class="screenshot-placeholder">screenshot coming soon</div>
     </div>
 
+    <p class="section-title">Architecture</p>
+    <div class="arch">
+      <p>Homeport is a pure aggregation layer. The hub reads from independent <strong>satellite</strong> services and renders widget cards. Each satellite is a standalone Docker container — usable without homeport.</p>
+      <p><span class="label">hub</span> &nbsp;→&nbsp; fetches <code>GET /widget</code> from each satellite, renders a card grid</p>
+      <p><span class="label">infra</span> &nbsp;→&nbsp; Docker monitoring: container status, CPU, RAM, disk</p>
+      <p><span class="label">inventory</span> &nbsp;→&nbsp; equipment and project tracker with shopping list</p>
+      <p><span class="label">third-party</span> &nbsp;→&nbsp; Vikunja (tasks), Actual Budget (finances), Quartz (notes) — link cards, no code needed</p>
+    </div>
+
     <p class="section-title">Features</p>
     <div class="features">
       <div class="feature">
-        <div class="feature-title">container cards</div>
-        <div class="feature-desc">Live status, uptime, CPU and RAM per container. Stop, restart, and start in one click.</div>
+        <div class="feature-title">hub + satellites</div>
+        <div class="feature-desc">Add a new domain by deploying a container and adding one line to satellites.json. The hub never changes.</div>
       </div>
       <div class="feature">
-        <div class="feature-title">system metrics</div>
-        <div class="feature-desc">CPU, RAM, and disk usage bars — updated every 5 seconds.</div>
+        <div class="feature-title">widget protocol</div>
+        <div class="feature-desc">Each satellite exposes <code>GET /widget</code> — a standard JSON response with status, summary, and metrics.</div>
       </div>
       <div class="feature">
-        <div class="feature-title">update all</div>
-        <div class="feature-desc">Pulls latest images for every container, restarts only those that changed.</div>
+        <div class="feature-title">infrastructure satellite</div>
+        <div class="feature-desc">Live container cards, system metrics, stop/restart/start actions, and Dozzle log links.</div>
       </div>
       <div class="feature">
-        <div class="feature-title">no build step</div>
-        <div class="feature-desc">Vanilla JS and CSS. Static files reload on save — no bundler, no framework.</div>
+        <div class="feature-title">inventory satellite</div>
+        <div class="feature-desc">Track equipment by category, quantity, and location. Assign items to projects. Shopping list for low-stock items.</div>
       </div>
       <div class="feature">
-        <div class="feature-title">detail view</div>
-        <div class="feature-desc">Image, ports, mounts, networks, live stats, and deep link to Dozzle logs.</div>
+        <div class="feature-title">shared UI</div>
+        <div class="feature-desc">All satellites use <code>@homeport/ui</code> — a shared React component library with a consistent dark theme.</div>
       </div>
       <div class="feature">
-        <div class="feature-title">mobile friendly</div>
-        <div class="feature-desc">Responsive layout — works on phones and tablets without a separate view.</div>
+        <div class="feature-title">no vendor lock-in</div>
+        <div class="feature-desc">Third-party tools (Vikunja, Actual Budget) are first-class satellites — just link cards, no integration code.</div>
       </div>
     </div>
 
-    <div class="deploy">
-      <p class="section-title">Deploy</p>
-      <pre><span class="comment"># docker-compose.yml</span>
-services:
-  dashboard:
-    build: ./app
-    container_name: dashboard
-    restart: unless-stopped
-    ports:
-      - "3001:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./app/static:/app/static:ro
-      - ./data:/data
-    environment:
-      - DOZZLE_URL=http://your-host:9999
-      - CONTAINER_NAME=dashboard
-      - HOSTNAME_DISPLAY=station</pre>
-    </div>
+    <p class="section-title">Quick start</p>
+    <pre><span class="comment"># clone and configure</span>
+git clone https://github.com/sensokame/homeport
+cd homeport
+
+<span class="comment"># edit satellites.json to match your setup</span>
+cp apps/hub/satellites.json.example apps/hub/satellites.json
+
+<span class="comment"># start the hub</span>
+docker compose -f apps/hub/docker-compose.yml up -d
+
+<span class="comment"># start the infra satellite</span>
+docker compose -f apps/infra/docker-compose.yml up -d</pre>
 
     <div class="stack">
       <p class="section-title">Stack</p>
       <table>
         <tr><th>Layer</th><th>Tech</th></tr>
-        <tr><td>backend</td><td>FastAPI, Docker SDK for Python, psutil</td></tr>
-        <tr><td>frontend</td><td>Vanilla JS, CSS custom properties, hash routing</td></tr>
-        <tr><td>container</td><td>Python 3.11-slim</td></tr>
+        <tr><td>monorepo</td><td>pnpm workspaces</td></tr>
+        <tr><td>frontend</td><td>React + TypeScript + Vite</td></tr>
+        <tr><td>shared UI</td><td>@homeport/ui — React components + CSS tokens</td></tr>
+        <tr><td>backend</td><td>FastAPI (Python) per satellite</td></tr>
+        <tr><td>database</td><td>SQLite per data-bearing satellite</td></tr>
+        <tr><td>proxy</td><td>Nginx Proxy Manager + Cloudflare Tunnel</td></tr>
       </table>
     </div>
 
     <footer>
-      MIT License &nbsp;·&nbsp; <a href="https://github.com/sensokame/station-dashboard">github.com/sensokame/station-dashboard</a>
+      MIT License &nbsp;·&nbsp; <a href="https://github.com/sensokame/homeport">github.com/sensokame/homeport</a>
     </footer>
 
   </div>
