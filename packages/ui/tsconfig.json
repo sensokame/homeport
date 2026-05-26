@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@homeport/ui": ["./src/index.ts"],
+      "@homeport/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
