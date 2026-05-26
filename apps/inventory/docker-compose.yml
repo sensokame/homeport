@@ -1,0 +1,15 @@
+services:
+  inventory:
+    build:
+      context: ../..
+      dockerfile: apps/inventory/Dockerfile
+    container_name: inventory
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
