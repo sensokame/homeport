@@ -1,18 +1,16 @@
 services:
-  dashboard:
-    build: ./app
-    container_name: dashboard
+  infra:
+    build:
+      context: ../..
+      dockerfile: apps/infra/Dockerfile
+    container_name: infra
     restart: unless-stopped
-    ports:
-      - "3001:8080"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./app/static:/app/static:ro
-      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - DOZZLE_URL=http://your-host:9999   # URL of your Dozzle instance
-      - CONTAINER_NAME=dashboard            # must match the container_name above
-      - HOSTNAME_DISPLAY=station            # label shown in the top bar
+      - DOZZLE_URL=${DOZZLE_URL:-}
+      - OWN_NAME=infra
+      - HOSTNAME_DISPLAY=${HOSTNAME_DISPLAY:-station}
     networks:
       - proxy-network
 

@@ -1,18 +1,15 @@
-import json
 import os
 import threading
 from pathlib import Path
-from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 import docker
 import psutil
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-STATIC = Path(__file__).parent / "static"
-TODOS_FILE = Path("/data/todos.json")
-OWN_NAME = os.getenv("CONTAINER_NAME", "dashboard")
+STATIC_DIR = Path(__file__).parent / "static"
+OWN_NAME = os.getenv("CONTAINER_NAME", "infra")
 
 app = FastAPI()
 docker_client = docker.from_env()
@@ -47,9 +44,7 @@ def _run_update():
             _update_state["results"] = results
 
 
-# ── Helpers ──
-
-def _container_info(c):
+def _container_info(c) -> dict:
     return {
         "id": c.short_id,
         "name": c.name,
@@ -58,27 +53,50 @@ def _container_info(c):
         "started": c.attrs["State"]["StartedAt"],
     }
 
-def _load_todos():
-    if TODOS_FILE.exists():
-        return json.loads(TODOS_FILE.read_text())
-    return []
 
-def _save_todos(todos):
-    TODOS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TODOS_FILE.write_text(json.dumps(todos, indent=2))
+# ── Widget ────────────────────────────────────────────────────────────────────
+
+@app.get("/widget")
+def widget():
+    all_containers = docker_client.containers.list(all=True)
+    total = len(all_containers)
+    running = sum(1 for c in all_containers if c.status == "running")
+    stopped = total - running
+
+    if total == 0 or running == total:
+        status = "ok"
+    elif stopped / total > 0.2:
+        status = "error"
+    else:
+        status = "warn"
+
+    cpu = psutil.cpu_percent(interval=0.2)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+
+    return {
+        "title": "Infrastructure",
+        "status": status,
+        "summary": f"{running} / {total} containers running",
+        "metrics": [
+            {"label": "CPU",  "value": f"{cpu}%", "alert": cpu > 80},
+            {"label": "RAM",  "value": f"{mem.used / 1e9:.1f} GB / {mem.total / 1e9:.1f} GB"},
+            {"label": "Disk", "value": f"{disk.percent}%", "alert": disk.percent > 80},
+        ],
+    }
 
 
-# ── Config ──
+# ── Config ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/config")
 def get_config():
     return {
-        "dozzle_url": os.getenv("DOZZLE_URL", "http://localhost:9999"),
+        "dozzle_url": os.getenv("DOZZLE_URL", ""),
         "hostname": os.getenv("HOSTNAME_DISPLAY", os.uname().nodename),
     }
 
 
-# ── Containers ──
+# ── Containers ────────────────────────────────────────────────────────────────
 
 @app.get("/api/containers")
 def list_containers():
@@ -138,6 +156,26 @@ def container_action(name: str, action: str):
         raise HTTPException(status_code=404, detail="not found")
 
 
+# ── System ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/system")
+def system_stats():
+    cpu = psutil.cpu_percent(interval=0.5)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    return {
+        "cpu_percent": round(cpu, 1),
+        "mem_used": mem.used,
+        "mem_total": mem.total,
+        "mem_percent": round(mem.percent, 1),
+        "disk_used": disk.used,
+        "disk_total": disk.total,
+        "disk_percent": round(disk.percent, 1),
+    }
+
+
+# ── Actions ───────────────────────────────────────────────────────────────────
+
 @app.post("/api/actions/restart-all")
 def restart_all():
     containers = [c for c in docker_client.containers.list() if c.name != OWN_NAME]
@@ -163,66 +201,17 @@ def update_status():
     return dict(_update_state)
 
 
-# ── System ──
+# ── Static / SPA ──────────────────────────────────────────────────────────────
 
-@app.get("/api/system")
-def system_stats():
-    cpu = psutil.cpu_percent(interval=0.5)
-    mem = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
-    return {
-        "cpu_percent": round(cpu, 1),
-        "mem_used": mem.used,
-        "mem_total": mem.total,
-        "mem_percent": round(mem.percent, 1),
-        "disk_used": disk.used,
-        "disk_total": disk.total,
-        "disk_percent": round(disk.percent, 1),
-    }
+if STATIC_DIR.exists():
+    assets_dir = STATIC_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-
-# ── Todos ──
-
-@app.get("/api/todos")
-def get_todos():
-    return _load_todos()
-
-
-@app.post("/api/todos")
-async def add_todo(request: Request):
-    body = await request.json()
-    text = (body.get("text") or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="text required")
-    todos = _load_todos()
-    todo = {"id": str(uuid4()), "text": text, "done": False}
-    todos.append(todo)
-    _save_todos(todos)
-    return todo
-
-
-@app.patch("/api/todos/{todo_id}")
-def toggle_todo(todo_id: str):
-    todos = _load_todos()
-    for t in todos:
-        if t["id"] == todo_id:
-            t["done"] = not t["done"]
-            _save_todos(todos)
-            return t
-    raise HTTPException(status_code=404, detail="not found")
-
-
-@app.delete("/api/todos/{todo_id}")
-def delete_todo(todo_id: str):
-    todos = _load_todos()
-    _save_todos([t for t in todos if t["id"] != todo_id])
-    return {"ok": True}
-
-
-# ── Static / SPA ──
-
-app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
-    return FileResponse(STATIC / "index.html")
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return {"detail": "frontend not built — run pnpm build"}
