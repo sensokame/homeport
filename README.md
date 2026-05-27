@@ -1,76 +1,58 @@
-# station
+# homeport
 
-A lightweight Docker control panel for your home server — container cards, live system metrics, and one-click workflows.
+A self-hosted personal hub. Aggregates independent **satellite** services into one dashboard — no lock-in, no domain logic.
 
-![station dashboard](docs/screenshot.png)
+**[Documentation →](https://sensokame.github.io/homeport)**
 
-## Features
+---
 
-- **Live container cards** — status, uptime, CPU and RAM per container, stop/restart/start in one click
-- **System metrics** — CPU, RAM, and disk usage bars updated every 5 seconds
-- **Container detail view** — image, ports, mounts, networks, live stats, Dozzle deep link
-- **Restart all** — restarts every container except the dashboard itself
-- **Update all** — pulls latest images for all containers, restarts only those that changed
-- **No framework** — vanilla JS SPA, hash routing, no build step; static files reload instantly on save
-- **Mobile friendly** — responsive layout works on phones and tablets
+## How it works
 
-## Deploy
+The hub reads `satellites.json` and renders a card grid. Each satellite is a standalone Docker container that exposes `GET /widget`. Adding a new domain = deploy a container + one line in `satellites.json`. The hub never changes.
 
-```yaml
-services:
-  dashboard:
-    build: ./app
-    container_name: dashboard
-    restart: unless-stopped
-    ports:
-      - "3001:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./app/static:/app/static:ro
-      - ./data:/data
-    environment:
-      - DOZZLE_URL=http://your-host:9999   # URL of your Dozzle instance
-      - CONTAINER_NAME=dashboard            # must match container_name above
-      - HOSTNAME_DISPLAY=station            # label shown in the top bar
-```
+Third-party tools (Vikunja, Actual Budget, Quartz) are link cards — no integration code needed.
+
+## Apps
+
+| App | Description |
+|---|---|
+| `apps/hub` | Hub — aggregates satellites into a card grid |
+| `apps/infra` | Infrastructure satellite — Docker monitoring, system metrics, container actions |
+| `apps/inventory` | Inventory satellite — equipment and project tracker with shopping list |
+
+## Packages
+
+| Package | Description |
+|---|---|
+| `packages/ui` | `@homeport/ui` — shared React component library and CSS design tokens |
+
+## Quick start
 
 ```bash
-docker compose up -d --build
+git clone https://github.com/sensokame/homeport
+cd homeport
+
+# hub
+docker compose -f apps/hub/docker-compose.yml up -d
+
+# infra satellite
+docker compose -f apps/infra/docker-compose.yml up -d
+
+# inventory satellite
+docker compose -f apps/inventory/docker-compose.yml up -d
 ```
 
-Then open `http://your-host:3001`.
-
-## Configuration
-
-| Variable | Default | Description |
-|---|---|---|
-| `DOZZLE_URL` | `http://localhost:9999` | Base URL of your [Dozzle](https://dozzle.dev) instance |
-| `CONTAINER_NAME` | `dashboard` | Name of this container — excluded from restart-all and update-all |
-| `HOSTNAME_DISPLAY` | system hostname | Label shown in the top bar |
-
-## Requirements
-
-- Docker with socket access (`/var/run/docker.sock`)
-- Python 3.11+ (handled by the Dockerfile)
-- [Dozzle](https://dozzle.dev) for log links (optional — links just won't resolve without it)
+See the [full documentation](https://sensokame.github.io/homeport) for configuration, the widget protocol, and how to add new satellites.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Backend | [FastAPI](https://fastapi.tiangolo.com), [Docker SDK for Python](https://docker-py.readthedocs.io), [psutil](https://github.com/giampaolo/psutil) |
-| Frontend | Vanilla JS, CSS custom properties, hash routing |
-| Container | Python 3.11-slim |
-
-## Development
-
-Static files (`app/static/`) are volume-mounted read-only — JS and CSS changes apply on browser refresh with no rebuild.
-
-Python changes require a rebuild:
-
-```bash
-docker compose up -d --build
-```
+| Monorepo | pnpm workspaces |
+| Frontend | React + TypeScript + Vite |
+| Shared UI | `@homeport/ui` — React components + CSS tokens |
+| Backend | FastAPI (Python) per satellite |
+| Database | SQLite per data-bearing satellite |
 
 ## License
 
