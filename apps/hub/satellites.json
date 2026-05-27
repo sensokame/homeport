@@ -7,6 +7,13 @@
     "icon": "server"
   },
   {
+    "id": "inventory",
+    "name": "Inventory",
+    "url": "http://inventory.station",
+    "widget_url": "http://inventory:8080/widget",
+    "icon": "package"
+  },
+  {
     "id": "quartz",
     "name": "Notes",
     "url": "http://quartz.station",
