@@ -47,6 +47,18 @@
   background: rgba(248, 81, 73, 0.1);
 }
 
+.secondary {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+}
+
 .ghost {
   border-color: transparent;
   background: transparent;

@@ -1,14 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, StatusDot, MetricBar, Button } from '@homeport/ui'
+import { Card, StatusDot, MetricBar, Button, Modal } from '@homeport/ui'
 import type { Container, ContainerStats, SystemStats, Config } from '../types'
 import {
-  getContainers, getSystem, getStats, containerAction,
+  getContainers, getSystem, getAllStats, containerAction, redeployContainer, groupAction,
   restartAll, updateAll, getUpdateStatus, formatBytes, formatUptime,
 } from '../api'
 import styles from './Overview.module.css'
 
 interface OverviewProps {
   config: Config | null
+}
+
+const GROUP_ORDER = ['orchestrator', 'public', 'internal'] as const
+const GROUP_LABELS: Record<string, string> = {
+  orchestrator: 'Orchestrators',
+  public:       'Public — sensokame.com',
+  internal:     'Internal — station',
 }
 
 export default function Overview({ config }: OverviewProps) {
@@ -18,6 +25,7 @@ export default function Overview({ config }: OverviewProps) {
   const [loading, setLoading]       = useState(true)
   const [updating, setUpdating]     = useState(false)
   const [updateMsg, setUpdateMsg]   = useState('')
+  const [dialog, setDialog]         = useState<{ message: string; onConfirm: () => void } | null>(null)
   const updatePollRef               = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadOverview = useCallback(async () => {
@@ -28,12 +36,8 @@ export default function Overview({ config }: OverviewProps) {
   }, [])
 
   const loadStats = useCallback(async () => {
-    const running = containers.filter(c => c.status === 'running')
-    const results = await Promise.allSettled(running.map(c => getStats(c.name)))
-    const map: Record<string, ContainerStats> = {}
-    results.forEach((r, i) => {
-      if (r.status === 'fulfilled') map[running[i].name] = r.value
-    })
+    if (containers.filter(c => c.status === 'running').length === 0) return
+    const map = await getAllStats()
     setStats(map)
   }, [containers])
 
@@ -55,41 +59,126 @@ export default function Overview({ config }: OverviewProps) {
     setTimeout(loadOverview, 1000)
   }
 
-  const handleRestartAll = async () => {
-    if (!confirm('Restart all containers? (infra will not restart itself)')) return
-    const r = await restartAll()
-    setUpdateMsg(`Restarted ${r.count} containers`)
-    setTimeout(() => setUpdateMsg(''), 5000)
-    setTimeout(loadOverview, 2000)
+  const handleRedeploy = (name: string) => {
+    setDialog({
+      message: `Redeploy ${name}? The container will be recreated from its compose config.`,
+      onConfirm: async () => {
+        await redeployContainer(name)
+        setTimeout(loadOverview, 2500)
+      },
+    })
   }
 
-  const handleUpdateAll = async () => {
-    if (!confirm('Pull latest images for all containers and restart those that changed?')) return
-    const r = await updateAll()
-    if (!r.ok) { setUpdateMsg(r.reason ?? 'already running'); return }
-    setUpdating(true)
-    setUpdateMsg('Pulling images…')
-    updatePollRef.current = setInterval(async () => {
-      const s = await getUpdateStatus()
-      if (!s.running) {
-        clearInterval(updatePollRef.current!)
-        setUpdating(false)
-        const updated  = s.results.filter(r => r.status === 'updated').length
-        const upToDate = s.results.filter(r => r.status === 'up-to-date').length
-        const errors   = s.results.filter(r => r.status === 'error').length
-        setUpdateMsg(`${updated} updated, ${upToDate} up-to-date${errors ? `, ${errors} errors` : ''}`)
-        setTimeout(() => setUpdateMsg(''), 8000)
-        if (updated > 0) loadOverview()
-      } else {
-        setUpdateMsg(`Pulling… (${s.results.length} done)`)
-      }
-    }, 2000)
+  const handleGroupAction = (group: string, action: string, label: string) => {
+    const messages: Record<string, string> = {
+      restart:  `Restart all containers in ${label}?`,
+      stop:     `Stop all containers in ${label}?`,
+      start:    `Start all containers in ${label}?`,
+      redeploy: `Redeploy all containers in ${label}? Each will be recreated from its compose config.`,
+    }
+    setDialog({
+      message: messages[action],
+      onConfirm: async () => {
+        await groupAction(group, action)
+        setTimeout(loadOverview, 1000)
+      },
+    })
+  }
+
+  const handleRestartAll = () => {
+    setDialog({
+      message: 'Restart all containers? (infra will not restart itself)',
+      onConfirm: async () => {
+        const r = await restartAll()
+        setUpdateMsg(`Restarted ${r.count} containers`)
+        setTimeout(() => setUpdateMsg(''), 5000)
+        setTimeout(loadOverview, 2000)
+      },
+    })
+  }
+
+  const handleUpdateAll = () => {
+    setDialog({
+      message: 'Pull latest images for all containers and restart those that changed?',
+      onConfirm: async () => {
+        const r = await updateAll()
+        if (!r.ok) { setUpdateMsg(r.reason ?? 'already running'); return }
+        setUpdating(true)
+        setUpdateMsg('Pulling images…')
+        updatePollRef.current = setInterval(async () => {
+          const s = await getUpdateStatus()
+          if (!s.running) {
+            clearInterval(updatePollRef.current!)
+            setUpdating(false)
+            const updated  = s.results.filter(r => r.status === 'updated').length
+            const upToDate = s.results.filter(r => r.status === 'up-to-date').length
+            const errors   = s.results.filter(r => r.status === 'error').length
+            setUpdateMsg(`${updated} updated, ${upToDate} up-to-date${errors ? `, ${errors} errors` : ''}`)
+            setTimeout(() => setUpdateMsg(''), 8000)
+            if (updated > 0) loadOverview()
+          } else {
+            setUpdateMsg(`Pulling… (${s.results.length} done)`)
+          }
+        }, 2000)
+      },
+    })
   }
 
   const running = containers.filter(c => c.status === 'running').length
   const sorted  = [...containers].sort((a, b) =>
     (a.status === 'running' ? -1 : 1) - (b.status === 'running' ? -1 : 1) || a.name.localeCompare(b.name)
   )
+
+  const hasGroups = sorted.some(c => c.group)
+  const sections = hasGroups
+    ? [
+        ...GROUP_ORDER
+          .map(key => ({ key, label: GROUP_LABELS[key], containers: sorted.filter(c => c.group === key) }))
+          .filter(s => s.containers.length > 0),
+        { key: 'other', label: 'Other', containers: sorted.filter(c => !c.group || !GROUP_ORDER.includes(c.group as typeof GROUP_ORDER[number])) },
+      ].filter(s => s.containers.length > 0)
+    : [{ key: 'all', label: '', containers: sorted }]
+
+  const renderCard = (c: Container) => {
+    const s = stats[c.name]
+    const isRunning = c.status === 'running'
+    const dozzleHref = config?.dozzle_url ? `${config.dozzle_url}/container/${c.id}` : undefined
+    return (
+      <Card
+        key={c.name}
+        status={isRunning ? 'ok' : c.status === 'restarting' ? 'warn' : 'error'}
+        className={styles.card}
+        onClick={() => { window.location.hash = `#/container/${encodeURIComponent(c.name)}` }}
+      >
+        <div className={styles.cardHeader}>
+          <StatusDot status={isRunning ? 'ok' : c.status === 'restarting' ? 'warn' : 'error'} />
+          <span className={styles.cardName}>{c.name}</span>
+          <Button size="sm" variant="secondary" className={styles.cardRedeployBtn}
+            onClick={e => { e.stopPropagation(); handleRedeploy(c.name) }}>redeploy</Button>
+        </div>
+        <div className={styles.cardImage}>{c.image.replace(/:latest$/, '')}</div>
+        <div className={styles.cardMeta}>
+          {isRunning
+            ? <><span>up {formatUptime(c.started)}</span>{s && <><span>cpu {s.cpu_percent}%</span><span>{formatBytes(s.mem_usage)}</span></>}</>
+            : <span>{c.status}</span>
+          }
+        </div>
+        <div className={styles.cardActions} onClick={e => e.stopPropagation()}>
+          {isRunning ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => handleAction(c.name, 'restart')}>restart</Button>
+              <Button size="sm" variant="danger" onClick={() => handleAction(c.name, 'stop')}>stop</Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={() => handleAction(c.name, 'start')}>start</Button>
+          )}
+          {dozzleHref && (
+            <a className={styles.logsLink} href={dozzleHref} target="_blank" rel="noopener">logs →</a>
+          )}
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <div className={styles.root}>
@@ -106,46 +195,26 @@ export default function Overview({ config }: OverviewProps) {
           {loading ? 'Loading…' : `${running} / ${containers.length} running`}
         </p>
 
-        <div className={styles.grid}>
-          {sorted.map(c => {
-            const s = stats[c.name]
-            const isRunning = c.status === 'running'
-            const dozzleHref = config?.dozzle_url ? `${config.dozzle_url}/container/${c.id}` : undefined
-            return (
-              <Card
-                key={c.name}
-                status={isRunning ? 'ok' : c.status === 'restarting' ? 'warn' : 'error'}
-                className={styles.card}
-                onClick={() => { window.location.hash = `#/container/${encodeURIComponent(c.name)}` }}
-              >
-                <div className={styles.cardHeader}>
-                  <StatusDot status={isRunning ? 'ok' : c.status === 'restarting' ? 'warn' : 'error'} />
-                  <span className={styles.cardName}>{c.name}</span>
-                </div>
-                <div className={styles.cardImage}>{c.image.replace(/:latest$/, '')}</div>
-                <div className={styles.cardMeta}>
-                  {isRunning
-                    ? <><span>up {formatUptime(c.started)}</span>{s && <><span>cpu {s.cpu_percent}%</span><span>{formatBytes(s.mem_usage)}</span></>}</>
-                    : <span>{c.status}</span>
-                  }
-                </div>
-                <div className={styles.cardActions} onClick={e => e.stopPropagation()}>
-                  {isRunning ? (
-                    <>
-                      <Button size="sm" variant="ghost" onClick={() => handleAction(c.name, 'restart')}>restart</Button>
-                      <Button size="sm" variant="danger" onClick={() => handleAction(c.name, 'stop')}>stop</Button>
-                    </>
-                  ) : (
-                    <Button size="sm" onClick={() => handleAction(c.name, 'start')}>start</Button>
-                  )}
-                  {dozzleHref && (
-                    <a className={styles.logsLink} href={dozzleHref} target="_blank" rel="noopener">logs →</a>
-                  )}
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+        {sections.map(section => (
+          <div key={section.key} className={styles.section}>
+            {section.label && (
+              <div className={styles.sectionHeader}>
+                <span className={styles.sectionTitle}>{section.label}</span>
+                {section.key !== 'other' && (
+                  <div className={styles.sectionActions}>
+                    <Button size="sm" variant="ghost" onClick={() => handleGroupAction(section.key, 'restart', section.label)}>restart</Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleGroupAction(section.key, 'stop', section.label)}>stop</Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleGroupAction(section.key, 'start', section.label)}>start</Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleGroupAction(section.key, 'redeploy', section.label)}>redeploy</Button>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className={styles.grid}>
+              {section.containers.map(renderCard)}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className={styles.bottomBar}>
@@ -155,6 +224,16 @@ export default function Overview({ config }: OverviewProps) {
         </Button>
         {updateMsg && <span className={styles.updateMsg}>{updateMsg}</span>}
       </div>
+
+      {dialog && (
+        <Modal title="Confirm" onClose={() => setDialog(null)}>
+          <p className={styles.dialogMessage}>{dialog.message}</p>
+          <div className={styles.dialogActions}>
+            <Button variant="ghost" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button onClick={() => { setDialog(null); dialog.onConfirm() }}>Confirm</Button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

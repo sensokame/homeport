@@ -1,5 +1,7 @@
 import os
+import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import docker
@@ -16,6 +18,9 @@ docker_client = docker.from_env()
 
 _update_lock = threading.Lock()
 _update_state: dict = {"running": False, "done": False, "results": []}
+
+# Warm up psutil CPU baseline — first call always returns 0.0
+psutil.cpu_percent()
 
 
 def _run_update():
@@ -45,13 +50,36 @@ def _run_update():
 
 
 def _container_info(c) -> dict:
+    labels = c.labels or {}
     return {
         "id": c.short_id,
         "name": c.name,
         "status": c.status,
         "image": c.image.tags[0] if c.image.tags else c.image.short_id,
         "started": c.attrs["State"]["StartedAt"],
+        "group": labels.get("homeport.group", ""),
     }
+
+
+def _compute_stats(c) -> dict | None:
+    try:
+        s = c.stats(stream=False)
+        cpu_delta = (
+            s["cpu_stats"]["cpu_usage"]["total_usage"]
+            - s["precpu_stats"]["cpu_usage"]["total_usage"]
+        )
+        sys_delta = s["cpu_stats"]["system_cpu_usage"] - s["precpu_stats"]["system_cpu_usage"]
+        ncpus = s["cpu_stats"].get("online_cpus", 1)
+        cpu = round((cpu_delta / sys_delta) * ncpus * 100, 2) if sys_delta > 0 else 0
+        return {
+            "cpu_percent": cpu,
+            "mem_usage": s["memory_stats"].get("usage", 0),
+            "mem_limit": s["memory_stats"].get("limit", 0),
+            "net_rx": sum(v["rx_bytes"] for v in s.get("networks", {}).values()),
+            "net_tx": sum(v["tx_bytes"] for v in s.get("networks", {}).values()),
+        }
+    except Exception:
+        return None
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -70,7 +98,7 @@ def widget():
     else:
         status = "warn"
 
-    cpu = psutil.cpu_percent(interval=0.2)
+    cpu = psutil.cpu_percent()
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
 
@@ -127,21 +155,43 @@ def get_container_stats(name: str):
         raise HTTPException(status_code=404, detail="not found")
     if c.status != "running":
         return {"cpu_percent": 0, "mem_usage": 0, "mem_limit": 0, "net_rx": 0, "net_tx": 0}
-    s = c.stats(stream=False)
-    cpu_delta = (
-        s["cpu_stats"]["cpu_usage"]["total_usage"]
-        - s["precpu_stats"]["cpu_usage"]["total_usage"]
+    return _compute_stats(c) or {"cpu_percent": 0, "mem_usage": 0, "mem_limit": 0, "net_rx": 0, "net_tx": 0}
+
+
+@app.get("/api/stats")
+def get_all_stats():
+    running = [c for c in docker_client.containers.list() if c.status == "running"]
+    results: dict = {}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {pool.submit(_compute_stats, c): c.name for c in running}
+        for future in as_completed(futures):
+            name = futures[future]
+            data = future.result()
+            if data is not None:
+                results[name] = data
+    return results
+
+
+@app.post("/api/containers/{name}/redeploy")
+def redeploy_container(name: str):
+    if name == OWN_NAME:
+        raise HTTPException(status_code=400, detail="cannot redeploy self")
+    try:
+        c = docker_client.containers.get(name)
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="not found")
+    labels = c.labels or {}
+    config_file = labels.get("com.docker.compose.project.config_files")
+    service = labels.get("com.docker.compose.service")
+    if not config_file or not service:
+        raise HTTPException(status_code=400, detail="not a compose-managed container")
+    result = subprocess.run(
+        ["docker", "compose", "-f", config_file, "up", "-d", "--no-deps", "--force-recreate", service],
+        capture_output=True, text=True, timeout=120,
     )
-    sys_delta = s["cpu_stats"]["system_cpu_usage"] - s["precpu_stats"]["system_cpu_usage"]
-    ncpus = s["cpu_stats"].get("online_cpus", 1)
-    cpu = round((cpu_delta / sys_delta) * ncpus * 100, 2) if sys_delta > 0 else 0
-    return {
-        "cpu_percent": cpu,
-        "mem_usage": s["memory_stats"].get("usage", 0),
-        "mem_limit": s["memory_stats"].get("limit", 0),
-        "net_rx": sum(v["rx_bytes"] for v in s.get("networks", {}).values()),
-        "net_tx": sum(v["tx_bytes"] for v in s.get("networks", {}).values()),
-    }
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
+    return {"ok": True}
 
 
 @app.post("/api/containers/{name}/{action}")
@@ -156,11 +206,41 @@ def container_action(name: str, action: str):
         raise HTTPException(status_code=404, detail="not found")
 
 
+@app.post("/api/groups/{group}/{action}")
+def group_action(group: str, action: str):
+    if action not in ("restart", "stop", "start", "redeploy"):
+        raise HTTPException(status_code=400, detail="invalid action")
+    containers = [
+        c for c in docker_client.containers.list(all=True)
+        if c.labels.get("homeport.group") == group
+    ]
+    if not containers:
+        raise HTTPException(status_code=404, detail="no containers in group")
+    for c in containers:
+        if c.name == OWN_NAME:
+            continue
+        try:
+            if action == "redeploy":
+                labels = c.labels or {}
+                config_file = labels.get("com.docker.compose.project.config_files")
+                service = labels.get("com.docker.compose.service")
+                if config_file and service:
+                    subprocess.run(
+                        ["docker", "compose", "-f", config_file, "up", "-d", "--no-deps", "--force-recreate", service],
+                        capture_output=True, text=True, timeout=120,
+                    )
+            else:
+                getattr(c, action)()
+        except Exception:
+            pass
+    return {"ok": True, "count": len(containers)}
+
+
 # ── System ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/system")
 def system_stats():
-    cpu = psutil.cpu_percent(interval=0.5)
+    cpu = psutil.cpu_percent()
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     return {

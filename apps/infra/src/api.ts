@@ -10,8 +10,13 @@ export const getConfig      = () => req<Config>('/config')
 export const getContainers  = () => req<Container[]>('/containers')
 export const getContainer   = (name: string) => req<ContainerDetail>(`/containers/${encodeURIComponent(name)}`)
 export const getStats       = (name: string) => req<ContainerStats>(`/containers/${encodeURIComponent(name)}/stats`)
-export const containerAction = (name: string, action: string) =>
+export const getAllStats     = () => req<Record<string, ContainerStats>>('/stats')
+export const groupAction    = (group: string, action: string) =>
+  req<{ ok: boolean; count: number }>(`/groups/${encodeURIComponent(group)}/${action}`, { method: 'POST' })
+export const containerAction  = (name: string, action: string) =>
   req<{ ok: boolean }>(`/containers/${encodeURIComponent(name)}/${action}`, { method: 'POST' })
+export const redeployContainer = (name: string) =>
+  req<{ ok: boolean }>(`/containers/${encodeURIComponent(name)}/redeploy`, { method: 'POST' })
 export const getSystem      = () => req<SystemStats>('/system')
 export const restartAll     = () => req<{ ok: boolean; count: number }>('/actions/restart-all', { method: 'POST' })
 export const updateAll      = () => req<{ ok: boolean; reason?: string }>('/actions/update-all', { method: 'POST' })

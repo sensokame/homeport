@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { StatusDot, Button } from '@homeport/ui'
+import { StatusDot, Button, Modal } from '@homeport/ui'
 import type { ContainerDetail, ContainerStats, Config } from '../types'
-import { getContainer, getStats, containerAction, formatBytes, formatUptime } from '../api'
+import { getContainer, getStats, containerAction, redeployContainer, formatBytes, formatUptime } from '../api'
 import styles from './Detail.module.css'
 
 interface DetailProps {
@@ -13,6 +13,7 @@ export default function Detail({ name, config }: DetailProps) {
   const [container, setContainer] = useState<ContainerDetail | null>(null)
   const [stats, setStats]         = useState<ContainerStats | null>(null)
   const [acting, setActing]       = useState(false)
+  const [dialog, setDialog]       = useState<{ message: string; onConfirm: () => void } | null>(null)
 
   useEffect(() => {
     getContainer(name).then(setContainer)
@@ -36,6 +37,21 @@ export default function Detail({ name, config }: DetailProps) {
     } finally { setActing(false) }
   }
 
+  const handleRedeploy = () => {
+    setDialog({
+      message: `Redeploy ${name}? The container will be recreated from its compose config.`,
+      onConfirm: async () => {
+        setActing(true)
+        try {
+          await redeployContainer(name)
+          await new Promise(r => setTimeout(r, 2500))
+          const updated = await getContainer(name)
+          setContainer(updated)
+        } finally { setActing(false) }
+      },
+    })
+  }
+
   const back = () => { window.location.hash = '#/' }
 
   if (!container) return <div className={styles.root}><p className={styles.muted}>Loading…</p></div>
@@ -55,6 +71,7 @@ export default function Detail({ name, config }: DetailProps) {
       <div className={styles.header}>
         <StatusDot status={isRunning ? 'ok' : container.status === 'restarting' ? 'warn' : 'error'} />
         <span className={styles.name}>{container.name}</span>
+        <Button variant="secondary" disabled={acting} className={styles.redeployBtn} onClick={handleRedeploy}>redeploy</Button>
       </div>
 
       <table className={styles.table}>
@@ -64,9 +81,16 @@ export default function Detail({ name, config }: DetailProps) {
           <tr><td>restart</td>  <td>{container.restart_policy || 'none'}</td></tr>
           <tr><td>ports</td>    <td className={styles.mono}>{ports}</td></tr>
           <tr><td>networks</td> <td>{container.networks.join(', ') || '—'}</td></tr>
-          {container.mounts.map((m, i) => (
-            <tr key={i}><td>{i === 0 ? 'mounts' : ''}</td><td className={styles.mono}>{m}</td></tr>
-          ))}
+          {container.mounts.length > 0 && (
+            <tr>
+              <td>mounts</td>
+              <td className={styles.mono}>
+                <div className={styles.mountList}>
+                  {container.mounts.map((m, i) => <span key={i}>{m}</span>)}
+                </div>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -92,6 +116,16 @@ export default function Detail({ name, config }: DetailProps) {
 
       {dozzleHref && (
         <a className={styles.dozzle} href={dozzleHref} target="_blank" rel="noopener">view logs in Dozzle →</a>
+      )}
+
+      {dialog && (
+        <Modal title="Confirm" onClose={() => setDialog(null)}>
+          <p>{dialog.message}</p>
+          <div className={styles.actions}>
+            <Button variant="ghost" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button onClick={() => { setDialog(null); dialog.onConfirm() }}>Confirm</Button>
+          </div>
+        </Modal>
       )}
     </div>
   )
