@@ -4,7 +4,7 @@ WORKDIR /repo
 
 RUN npm install -g pnpm
 
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/ packages/
 COPY apps/hub/ apps/hub/
 
