@@ -131,14 +131,17 @@ Variants: `ok`, `warn`, `error`, `default`.
 
 ```tsx
 <Button variant="primary">Save</Button>
+<Button variant="secondary">Redeploy</Button>
 <Button variant="danger" size="sm">Delete</Button>
 <Button variant="ghost">Cancel</Button>
 ```
 
 | Prop | Values | Default |
 |---|---|---|
-| `variant` | `primary`, `danger`, `ghost` | `primary` |
+| `variant` | `primary`, `secondary`, `danger`, `ghost` | `primary` |
 | `size` | `default`, `sm` | `default` |
+
+`secondary` — faint border, muted text, no fill. Use for significant-but-not-destructive actions that need to be visually distinct without competing with primary actions.
 
 All other `<button>` HTML attributes are forwarded.
 

@@ -9,7 +9,8 @@ Docker container monitoring. Exposes live container status, system metrics, and 
 - Container card grid — status, image, uptime, CPU, RAM per container
 - Container detail view — ports, mounts, networks, live stats, Dozzle log link
 - System metrics bar — CPU%, RAM, disk usage
-- Actions: stop, start, restart per container
+- Actions: stop, start, restart, **redeploy** per container
+- Group actions: restart, stop, start, **redeploy** per section (Orchestrators / Public / Internal)
 - **Restart all** — restarts every container except infra itself
 - **Update all** — pulls latest images, restarts only those that changed
 - `GET /widget` — live summary for the hub
@@ -53,7 +54,9 @@ Status logic: `ok` if all containers running, `error` if >20% stopped, `warn` ot
 | `GET /api/containers` | List all containers |
 | `GET /api/containers/{name}` | Single container detail |
 | `GET /api/containers/{name}/stats` | Live CPU/RAM/network stats |
+| `POST /api/containers/{name}/redeploy` | Recreate container via `docker compose --force-recreate` |
 | `POST /api/containers/{name}/{action}` | `start`, `stop`, or `restart` |
+| `POST /api/groups/{group}/{action}` | `start`, `stop`, `restart`, or `redeploy` for all containers with a `homeport.group` label |
 | `GET /api/system` | CPU, RAM, disk metrics |
 | `POST /api/actions/restart-all` | Restart all containers except self |
 | `POST /api/actions/update-all` | Pull + restart updated containers (async) |
@@ -73,6 +76,9 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /docker-data/orchestrators.yml:/docker-data/orchestrators.yml:ro
+      - /docker-data/internal.yml:/docker-data/internal.yml:ro
+      - /docker-data/external.yml:/docker-data/external.yml:ro
     environment:
       - DOZZLE_URL=${DOZZLE_URL:-}
       - CONTAINER_NAME=infra
@@ -85,4 +91,4 @@ networks:
     external: true
 ```
 
-The Docker socket is mounted read-write for container actions (start/stop/restart/pull). If you only need monitoring, you can add `:ro`.
+The Docker socket is mounted `:ro` — sufficient for all container actions including redeploy (the `:ro` flag only prevents the socket file from being replaced, not API communication through it). The three compose files are mounted read-only so the redeploy endpoint can call `docker compose --force-recreate` for the correct service. Adjust the paths to match your compose file locations.
