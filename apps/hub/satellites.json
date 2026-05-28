@@ -14,12 +14,6 @@
     "icon": "package"
   },
   {
-    "id": "quartz",
-    "name": "Notes",
-    "url": "http://quartz.station",
-    "icon": "book"
-  },
-  {
     "id": "vikunja",
     "name": "Tasks",
     "url": "http://vikunja.station",
@@ -34,8 +28,8 @@
     "icon": "activity"
   },
   {
-    "id": "obsidian",
-    "name": "Obsidian",
+    "id": "knowledge",
+    "name": "Knowledge",
     "url": "http://quartz.station",
     "widget_url": "http://obsidian:8080/widget",
     "icon": "book-open"

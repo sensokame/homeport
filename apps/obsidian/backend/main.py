@@ -80,7 +80,7 @@ def widget():
         summary = "Nothing marked as reading"
 
     return {
-        "title": "Obsidian",
+        "title": "Knowledge",
         "status": "ok",
         "summary": summary,
         "metrics": [
