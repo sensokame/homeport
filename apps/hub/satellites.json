@@ -31,7 +31,7 @@
     "id": "knowledge",
     "name": "Knowledge",
     "url": "http://quartz.station",
-    "widget_url": "http://obsidian:8080/widget",
+    "widget_url": "http://knowledge:8080/widget",
     "icon": "book-open"
   },
   {
