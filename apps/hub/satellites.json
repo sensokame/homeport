@@ -30,6 +30,7 @@
     "id": "wger",
     "name": "Fitness",
     "url": "http://wger.station",
+    "widget_url": "http://wger-sat:8080/widget",
     "icon": "activity"
   },
   {
