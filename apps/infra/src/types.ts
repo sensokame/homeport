@@ -4,6 +4,7 @@ export interface Container {
   status: string
   image: string
   started: string
+  group: string
 }
 
 export interface ContainerDetail extends Container {

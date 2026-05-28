@@ -5,6 +5,8 @@ services:
       dockerfile: apps/infra/Dockerfile
     container_name: infra
     restart: unless-stopped
+    labels:
+      homeport.group: internal
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:

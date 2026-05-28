@@ -7,6 +7,8 @@ export interface Item {
   category: string
   subcategory: string
   quantity: number
+  quantity_reserved: number
+  available: number
   unit: string
   location: string
   status: ItemStatus

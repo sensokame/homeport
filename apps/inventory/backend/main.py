@@ -81,9 +81,18 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+ITEM_SELECT = """
+    SELECT i.*,
+           COALESCE((SELECT SUM(ia.quantity_reserved)
+                     FROM item_assignments ia WHERE ia.item_id = i.id), 0) AS quantity_reserved
+    FROM items i
+"""
+
 def item_row(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["specs"] = json.loads(d.get("specs") or "{}")
+    d.setdefault("quantity_reserved", 0)
+    d["available"] = d["quantity"] - d["quantity_reserved"]
     return d
 
 
@@ -144,7 +153,10 @@ def widget():
         total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         projects = conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
         low = conn.execute(
-            "SELECT COUNT(*) FROM items WHERE quantity <= threshold AND threshold > 0 OR status IN ('low','ordered','depleted')"
+            """SELECT COUNT(*) FROM items i
+               WHERE (threshold > 0 AND
+                      quantity - COALESCE((SELECT SUM(ia.quantity_reserved) FROM item_assignments ia WHERE ia.item_id = i.id), 0) <= threshold)
+                  OR status IN ('low','depleted')"""
         ).fetchone()[0]
     status = "warn" if low > 0 else "ok"
     summary = f"{total} items · {low} low stock" if low > 0 else f"{total} items · {projects} projects"
@@ -166,10 +178,11 @@ def widget():
 def shopping_list():
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT * FROM items
-               WHERE (threshold > 0 AND quantity <= threshold)
-                  OR status IN ('low', 'ordered', 'depleted')
-               ORDER BY name"""
+            f"""{ITEM_SELECT}
+               WHERE (i.threshold > 0 AND
+                      i.quantity - COALESCE((SELECT SUM(ia.quantity_reserved) FROM item_assignments ia WHERE ia.item_id = i.id), 0) <= i.threshold)
+                  OR i.status IN ('low', 'ordered', 'depleted')
+               ORDER BY i.name"""
         ).fetchall()
     return [item_row(r) for r in rows]
 
@@ -178,17 +191,17 @@ def shopping_list():
 def list_items(category: str = "", status: str = "", search: str = ""):
     clauses, params = [], []
     if category:
-        clauses.append("category = ?")
+        clauses.append("i.category = ?")
         params.append(category)
     if status:
-        clauses.append("status = ?")
+        clauses.append("i.status = ?")
         params.append(status)
     if search:
-        clauses.append("(name LIKE ? OR category LIKE ? OR location LIKE ?)")
+        clauses.append("(i.name LIKE ? OR i.category LIKE ? OR i.location LIKE ?)")
         params.extend([f"%{search}%"] * 3)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     with get_conn() as conn:
-        rows = conn.execute(f"SELECT * FROM items {where} ORDER BY name", params).fetchall()
+        rows = conn.execute(f"{ITEM_SELECT} {where} ORDER BY i.name", params).fetchall()
     return [item_row(r) for r in rows]
 
 
@@ -203,14 +216,14 @@ def create_item(body: ItemCreate):
              body.quantity, body.unit, body.location, body.status,
              body.threshold, json.dumps(body.specs), body.notes, ts, ts),
         )
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = conn.execute(f"{ITEM_SELECT} WHERE i.id = ?", (item_id,)).fetchone()
     return item_row(row)
 
 
 @app.get("/api/items/{item_id}")
 def get_item(item_id: str):
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = conn.execute(f"{ITEM_SELECT} WHERE i.id = ?", (item_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="not found")
     return item_row(row)
@@ -230,7 +243,7 @@ def update_item(item_id: str, body: ItemUpdate):
             f"UPDATE items SET {set_clause} WHERE id = ?",
             list(fields.values()) + [item_id],
         )
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = conn.execute(f"{ITEM_SELECT} WHERE i.id = ?", (item_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="not found")
     return item_row(row)

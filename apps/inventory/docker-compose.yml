@@ -5,6 +5,8 @@ services:
       dockerfile: apps/inventory/Dockerfile
     container_name: inventory
     restart: unless-stopped
+    labels:
+      homeport.group: internal
     volumes:
       - ./data:/data
     networks:

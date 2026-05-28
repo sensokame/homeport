@@ -4,6 +4,12 @@
   gap: var(--space-3);
 }
 
+.icon {
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+}
+
 .name {
   font-size: var(--text-base);
   font-weight: 600;

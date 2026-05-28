@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
 import { NavBar } from '@homeport/ui'
-import Inventory from './pages/Inventory'
+import Today from './pages/Today'
 import Projects from './pages/Projects'
-import ShoppingList from './pages/ShoppingList'
 import styles from './App.module.css'
 
-type Tab = 'inventory' | 'projects' | 'shopping'
+type Tab = 'today' | 'projects'
 
 function getTab(hash: string): Tab {
   if (hash === '#/projects') return 'projects'
-  if (hash === '#/shopping-list') return 'shopping'
-  return 'inventory'
+  return 'today'
 }
 
 export default function App() {
@@ -23,18 +21,16 @@ export default function App() {
   }, [])
 
   const links = [
-    { label: 'Inventory',     href: '#/',             active: tab === 'inventory' },
-    { label: 'Projects',      href: '#/projects',     active: tab === 'projects' },
-    { label: 'On Order', href: '#/shopping-list', active: tab === 'shopping' },
+    { label: 'Today',    href: '#/',         active: tab === 'today' },
+    { label: 'Projects', href: '#/projects', active: tab === 'projects' },
   ]
 
   return (
     <div className={styles.root}>
-      <NavBar hostname="Inventory" links={links} />
+      <NavBar hostname="Tasks" links={links} />
       <main className={styles.main}>
-        {tab === 'inventory' && <Inventory />}
-        {tab === 'projects'  && <Projects />}
-        {tab === 'shopping'  && <ShoppingList />}
+        {tab === 'today'    && <Today />}
+        {tab === 'projects' && <Projects />}
       </main>
     </div>
   )

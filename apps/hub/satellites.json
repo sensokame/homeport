@@ -23,7 +23,21 @@
     "id": "vikunja",
     "name": "Tasks",
     "url": "http://vikunja.station",
+    "widget_url": "http://vikunja-sat:8080/widget",
     "icon": "check-square"
+  },
+  {
+    "id": "wger",
+    "name": "Fitness",
+    "url": "http://wger.station",
+    "icon": "activity"
+  },
+  {
+    "id": "obsidian",
+    "name": "Obsidian",
+    "url": "http://quartz.station",
+    "widget_url": "http://obsidian:8080/widget",
+    "icon": "book-open"
   },
   {
     "id": "budget",

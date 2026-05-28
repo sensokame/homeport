@@ -16,6 +16,22 @@ const BLANK: Partial<Item> = {
   unit: 'pcs', location: '', status: 'in_stock', threshold: 0, notes: '',
 }
 
+function ConfirmModal({ message, onConfirm, onClose }: {
+  message: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  return (
+    <Modal title="Confirm delete" onClose={onClose}>
+      <p className={styles.confirmMessage}>{message}</p>
+      <div className={styles.formActions}>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="button" variant="danger" onClick={onConfirm}>Delete</Button>
+      </div>
+    </Modal>
+  )
+}
+
 function ItemModal({ item, onSave, onClose }: {
   item: Item | null
   onSave: (data: Partial<Item>) => Promise<void>
@@ -65,12 +81,13 @@ function ItemModal({ item, onSave, onClose }: {
 }
 
 export default function Inventory() {
-  const [items, setItems]     = useState<Item[]>([])
-  const [search, setSearch]   = useState('')
+  const [items, setItems]       = useState<Item[]>([])
+  const [search, setSearch]     = useState('')
   const [category, setCategory] = useState('')
-  const [status, setStatus]   = useState('')
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal]     = useState<'add' | Item | null>(null)
+  const [status, setStatus]     = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [modal, setModal]       = useState<'add' | Item | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,9 +111,10 @@ export default function Inventory() {
     await load()
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this item?')) return
-    await deleteItem(id)
+  const doDelete = async () => {
+    if (!confirmId) return
+    await deleteItem(confirmId)
+    setConfirmId(null)
     await load()
   }
 
@@ -115,13 +133,22 @@ export default function Inventory() {
           <option value="ordered">Ordered</option>
           <option value="depleted">Depleted</option>
         </Select>
-        <Button onClick={() => setModal('add')}>+ Add item</Button>
+        <div className={styles.toolbarRight}>
+          {!loading && <span className={styles.count}>{items.length} item{items.length !== 1 ? 's' : ''}</span>}
+          <Button onClick={() => setModal('add')}>+ Add item</Button>
+        </div>
       </div>
 
       {loading ? (
         <p className={styles.muted}>Loading…</p>
       ) : items.length === 0 ? (
-        <p className={styles.muted}>No items found.</p>
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>No items found</p>
+          <p className={styles.emptyHint}>{search || category || status ? 'Try clearing the filters.' : 'Add your first item to get started.'}</p>
+          {!search && !category && !status && (
+            <Button onClick={() => setModal('add')}>+ Add item</Button>
+          )}
+        </div>
       ) : (
         <div className={styles.tableWrap}>
           <table>
@@ -134,14 +161,30 @@ export default function Inventory() {
             <tbody>
               {items.map(item => (
                 <tr key={item.id}>
-                  <td>{item.name}</td>
-                  <td className={styles.dim}>{item.category || '—'}</td>
-                  <td className={styles.mono}>{item.quantity} {item.unit}</td>
+                  <td className={styles.nameCell}>
+                    <span>{item.name}</span>
+                    {item.notes && <span className={styles.notes}>{item.notes}</span>}
+                  </td>
+                  <td className={styles.dim}>
+                    {item.category || '—'}
+                    {item.subcategory && <span className={styles.sub}> · {item.subcategory}</span>}
+                  </td>
+                  <td className={styles.mono}>
+                    {item.quantity} {item.unit}
+                    {item.quantity_reserved > 0 && (
+                      <span className={styles.available}>{item.available} available</span>
+                    )}
+                  </td>
                   <td className={styles.dim}>{item.location || '—'}</td>
-                  <td><Badge label={item.status} variant={STATUS_VARIANTS[item.status]} /></td>
-                  <td className={styles.actions}>
-                    <Button size="sm" variant="ghost" onClick={() => setModal(item)}>edit</Button>
-                    <Button size="sm" variant="danger" onClick={() => handleDelete(item.id)}>del</Button>
+                  <td><Badge
+                    label={item.available <= 0 && item.status === 'in_stock' ? 'unavailable' : item.status.replace('_', ' ')}
+                    variant={item.available <= 0 && item.status === 'in_stock' ? 'error' : STATUS_VARIANTS[item.status]}
+                  /></td>
+                  <td>
+                    <div className={styles.actions}>
+                      <Button size="sm" variant="ghost" onClick={() => setModal(item)}>Edit</Button>
+                      <Button size="sm" variant="danger" onClick={() => setConfirmId(item.id)}>Delete</Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -155,6 +198,14 @@ export default function Inventory() {
           item={modal === 'add' ? null : modal as Item}
           onSave={handleSave}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {confirmId !== null && (
+        <ConfirmModal
+          message={`Delete "${items.find(i => i.id === confirmId)?.name}"? This cannot be undone.`}
+          onConfirm={doDelete}
+          onClose={() => setConfirmId(null)}
         />
       )}
     </div>

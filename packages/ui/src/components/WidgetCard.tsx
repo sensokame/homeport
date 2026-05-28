@@ -18,13 +18,15 @@ export interface WidgetData {
 interface WidgetCardProps {
   data: WidgetData
   url: string
+  icon?: React.ReactNode
 }
 
-export function WidgetCard({ data, url }: WidgetCardProps) {
+export function WidgetCard({ data, url, icon }: WidgetCardProps) {
   return (
     <Card status={data.status} className={styles.card}>
       <div className={styles.header}>
         <StatusDot status={data.status} />
+        {icon && <span className={styles.icon}>{icon}</span>}
         <span className={styles.title}>{data.title}</span>
       </div>
       <p className={styles.summary}>{data.summary}</p>

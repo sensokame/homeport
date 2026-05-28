@@ -5,6 +5,8 @@ services:
       dockerfile: apps/hub/Dockerfile
     container_name: hub
     restart: unless-stopped
+    labels:
+      homeport.group: internal
     volumes:
       - ./satellites.json:/app/satellites.json:ro
     environment:

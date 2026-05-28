@@ -14,6 +14,22 @@ const STATUS_VARIANTS: Record<ProjectStatus, 'ok' | 'warn' | 'error' | 'default'
 
 const BLANK = { name: '', description: '', status: 'planning' as ProjectStatus }
 
+function ConfirmModal({ message, onConfirm, onClose }: {
+  message: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  return (
+    <Modal title="Confirm delete" onClose={onClose}>
+      <p className={styles.confirmMessage}>{message}</p>
+      <div className={styles.formActions}>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="button" variant="danger" onClick={onConfirm}>Delete</Button>
+      </div>
+    </Modal>
+  )
+}
+
 function ProjectModal({ project, onSave, onClose }: {
   project: Project | null
   onSave: (data: Partial<Project>) => Promise<void>
@@ -69,7 +85,7 @@ function AssignModal({ projectId, onSave, onClose }: {
       <form className={styles.form} onSubmit={submit}>
         <Select label="Item *" value={itemId} onChange={e => setItemId(e.target.value)} required>
           <option value="">Select an item…</option>
-          {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.quantity} {i.unit} available)</option>)}
+          {items.filter(i => (i.available ?? i.quantity) > 0).map(i => <option key={i.id} value={i.id}>{i.name} ({i.available ?? i.quantity} {i.unit} available)</option>)}
         </Select>
         <div className={styles.row}>
           <Input label="Quantity reserved" type="number" value={qty} onChange={e => setQty(+e.target.value)} min={0} />
@@ -90,6 +106,7 @@ export default function Projects() {
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState<'add' | Project | null>(null)
   const [assignModal, setAssignModal] = useState(false)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -110,10 +127,11 @@ export default function Projects() {
     if (selected) await loadDetail(selected.id)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this project and all its assignments?')) return
-    await deleteProject(id)
-    setSelected(null)
+  const doDelete = async () => {
+    if (!confirmId) return
+    await deleteProject(confirmId)
+    setConfirmId(null)
+    if (selected?.id === confirmId) setSelected(null)
     await load()
   }
 
@@ -139,16 +157,24 @@ export default function Projects() {
       {loading ? (
         <p className={styles.muted}>Loading…</p>
       ) : projects.length === 0 ? (
-        <p className={styles.muted}>No projects yet.</p>
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>No projects yet</p>
+          <p className={styles.emptyHint}>Create a project to start tracking item assignments.</p>
+          <Button onClick={() => setModal('add')}>+ Add project</Button>
+        </div>
       ) : (
         <div className={styles.grid}>
           {projects.map(p => (
-            <Card key={p.id} className={styles.card} onClick={() => { setSelected(null); loadDetail(p.id) }}>
+            <Card
+              key={p.id}
+              className={`${styles.card} ${selected?.id === p.id ? styles.cardSelected : ''}`}
+              onClick={() => { setSelected(null); loadDetail(p.id) }}
+            >
               <div className={styles.cardHeader}>
-                <Badge label={p.status} variant={STATUS_VARIANTS[p.status as ProjectStatus]} />
                 <span className={styles.cardName}>{p.name}</span>
+                <Badge label={p.status} variant={STATUS_VARIANTS[p.status as ProjectStatus]} />
               </div>
-              <p className={styles.cardMeta}>{p.item_count ?? 0} items assigned</p>
+              <p className={styles.cardMeta}>{p.item_count ?? 0} item{(p.item_count ?? 0) !== 1 ? 's' : ''} assigned</p>
             </Card>
           ))}
         </div>
@@ -159,26 +185,33 @@ export default function Projects() {
           <div className={styles.detailHeader}>
             <span className={styles.detailTitle}>{selected.name}</span>
             <Badge label={selected.status} variant={STATUS_VARIANTS[selected.status]} />
-            <Button size="sm" variant="ghost" onClick={() => setModal(selected)}>edit</Button>
-            <Button size="sm" variant="danger" onClick={() => handleDelete(selected.id)}>delete</Button>
+            <div className={styles.detailActions}>
+              <Button size="sm" variant="ghost" onClick={() => setModal(selected)}>Edit</Button>
+              <Button size="sm" variant="danger" onClick={() => setConfirmId(selected.id)}>Delete</Button>
+            </div>
           </div>
           {selected.description && <p className={styles.detailDesc}>{selected.description}</p>}
 
-          <div className={styles.assignList}>
-            {(selected.assignments ?? []).length === 0 ? (
-              <p className={styles.muted}>No items assigned.</p>
-            ) : (
-              selected.assignments!.map(a => (
-                <div key={a.id} className={styles.assignRow}>
-                  <span className={styles.assignName}>{a.item_name}</span>
-                  <span className={styles.assignQty}>× {a.quantity_reserved}</span>
-                  {a.notes && <span className={styles.assignQty}>{a.notes}</span>}
-                  <Button size="sm" variant="danger" onClick={() => handleUnassign(a.id)}>remove</Button>
-                </div>
-              ))
-            )}
+          <div className={styles.assignSection}>
+            <div className={styles.assignHeader}>
+              <span className={styles.assignTitle}>Assigned items</span>
+              <Button size="sm" onClick={() => setAssignModal(true)}>+ Assign item</Button>
+            </div>
+            <div className={styles.assignList}>
+              {(selected.assignments ?? []).length === 0 ? (
+                <p className={styles.muted}>No items assigned yet.</p>
+              ) : (
+                selected.assignments!.map(a => (
+                  <div key={a.id} className={styles.assignRow}>
+                    <span className={styles.assignName}>{a.item_name}</span>
+                    <span className={styles.assignQty}>× {a.quantity_reserved}</span>
+                    {a.notes && <span className={styles.assignNote}>{a.notes}</span>}
+                    <Button size="sm" variant="danger" onClick={() => handleUnassign(a.id)}>Remove</Button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          <Button size="sm" onClick={() => setAssignModal(true)}>+ Assign item</Button>
         </div>
       )}
 
@@ -191,6 +224,13 @@ export default function Projects() {
       )}
       {assignModal && selected && (
         <AssignModal projectId={selected.id} onSave={handleAssign} onClose={() => setAssignModal(false)} />
+      )}
+      {confirmId !== null && (
+        <ConfirmModal
+          message={`Delete "${projects.find(p => p.id === confirmId)?.name}"? All item assignments will be removed.`}
+          onConfirm={doDelete}
+          onClose={() => setConfirmId(null)}
+        />
       )}
     </div>
   )
