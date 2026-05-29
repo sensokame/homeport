@@ -16,6 +16,21 @@ jobs:
       contents: read
       packages: write
 
+  release:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: .github/RELEASE_NOTES.md
+          make_latest: true
+
     strategy:
       matrix:
         app: [hub, infra, inventory, obsidian, vikunja, wger, actual]
