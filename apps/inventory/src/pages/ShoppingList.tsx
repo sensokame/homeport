@@ -106,7 +106,10 @@ export default function Manage() {
                     <td>{item.name}</td>
                     <td className={styles.dim}>{item.category || '—'}</td>
                     <td className={styles.mono}>
-                      {item.available} {item.unit}
+                      {item.quantity} {item.unit}
+                      {item.quantity_reserved > 0 && (
+                        <span className={styles.assigned}>{item.quantity_reserved} reserved</span>
+                      )}
                       {item.threshold > 0 && (
                         <span className={styles.assigned}>need {item.threshold} {item.unit}</span>
                       )}
@@ -167,7 +170,12 @@ export default function Manage() {
                   <tr key={item.id}>
                     <td>{item.name}</td>
                     <td className={styles.dim}>{item.category || '—'}</td>
-                    <td className={styles.mono}>{item.available} {item.unit}</td>
+                    <td className={styles.mono}>
+                      {item.quantity} {item.unit}
+                      {item.quantity_reserved > 0 && (
+                        <span className={styles.assigned}>{item.quantity_reserved} reserved</span>
+                      )}
+                    </td>
                     <td className={styles.mono}>
                       {item.quantity_on_order > 0 ? `${item.quantity_on_order} ${item.unit}` : '—'}
                     </td>
