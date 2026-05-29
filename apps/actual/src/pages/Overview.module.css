@@ -1,0 +1,115 @@
+.root { display: flex; flex-direction: column; gap: var(--space-6); }
+
+.empty { color: var(--color-muted); text-align: center; padding: var(--space-8) 0; }
+
+.monthHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.monthLabel {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.monthSummary {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.totalBar {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.groups { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.group {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.groupHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  gap: var(--space-3);
+}
+
+.groupHeader:hover { background: rgba(255,255,255,0.03); }
+
+.groupName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: left;
+}
+
+.groupMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.groupAmt {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+
+.chevron {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.groupBar {
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.categories {
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.catRow {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.catRow:last-child { border-bottom: none; }
+
+.catHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.catName { font-size: var(--text-sm); }
+
+.catAmt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+}
+
+.amtOk   { color: var(--color-muted); }
+.amtOver { color: var(--color-error); font-weight: 600; }
