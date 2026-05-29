@@ -1,4 +1,4 @@
-export type ItemStatus = 'in_stock' | 'low' | 'ordered' | 'depleted'
+export type ItemStatus = 'in_stock' | 'low' | 'ordered' | 'depleted' | 'needed'
 export type ProjectStatus = 'planning' | 'active' | 'paused' | 'done'
 
 export interface Item {
@@ -8,6 +8,7 @@ export interface Item {
   subcategory: string
   quantity: number
   quantity_reserved: number
+  quantity_on_order: number
   available: number
   unit: string
   location: string

@@ -25,7 +25,7 @@ export default function App() {
   const links = [
     { label: 'Inventory',     href: '#/',             active: tab === 'inventory' },
     { label: 'Projects',      href: '#/projects',     active: tab === 'projects' },
-    { label: 'On Order', href: '#/shopping-list', active: tab === 'shopping' },
+    { label: 'Manage',   href: '#/shopping-list', active: tab === 'shopping' },
   ]
 
   return (

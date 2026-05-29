@@ -25,19 +25,19 @@ def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS items (
-                id           TEXT PRIMARY KEY,
-                name         TEXT NOT NULL,
-                category     TEXT DEFAULT '',
-                subcategory  TEXT DEFAULT '',
-                quantity     REAL DEFAULT 0,
-                unit         TEXT DEFAULT 'pcs',
-                location     TEXT DEFAULT '',
-                status       TEXT DEFAULT 'in_stock',
-                threshold    REAL DEFAULT 0,
-                specs        TEXT DEFAULT '{}',
-                notes        TEXT DEFAULT '',
-                created_at   TEXT NOT NULL,
-                updated_at   TEXT NOT NULL
+                id                   TEXT PRIMARY KEY,
+                name                 TEXT NOT NULL,
+                category             TEXT DEFAULT '',
+                subcategory          TEXT DEFAULT '',
+                quantity             REAL DEFAULT 0,
+                unit                 TEXT DEFAULT 'pcs',
+                location             TEXT DEFAULT '',
+                status               TEXT DEFAULT 'in_stock',
+                threshold            REAL DEFAULT 0,
+                specs                TEXT DEFAULT '{}',
+                notes                TEXT DEFAULT '',
+                created_at           TEXT NOT NULL,
+                updated_at           TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS projects (
                 id           TEXT PRIMARY KEY,
@@ -92,11 +92,21 @@ def item_row(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["specs"] = json.loads(d.get("specs") or "{}")
     d.setdefault("quantity_reserved", 0)
+    d.setdefault("quantity_on_order", 0)
     d["available"] = d["quantity"] - d["quantity_reserved"]
     return d
 
 
+def migrate_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            conn.execute("ALTER TABLE items ADD COLUMN quantity_on_order REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
+
 init_db()
+migrate_db()
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -112,6 +122,7 @@ class ItemCreate(BaseModel):
     threshold: float = 0
     specs: dict = {}
     notes: str = ""
+    quantity_on_order: float = 0
 
 
 class ItemUpdate(BaseModel):
@@ -125,6 +136,7 @@ class ItemUpdate(BaseModel):
     threshold: Optional[float] = None
     specs: Optional[dict] = None
     notes: Optional[str] = None
+    quantity_on_order: Optional[float] = None
 
 
 class ProjectCreate(BaseModel):
@@ -156,7 +168,7 @@ def widget():
             """SELECT COUNT(*) FROM items i
                WHERE (threshold > 0 AND
                       quantity - COALESCE((SELECT SUM(ia.quantity_reserved) FROM item_assignments ia WHERE ia.item_id = i.id), 0) <= threshold)
-                  OR status IN ('low','depleted')"""
+                  OR status IN ('low','depleted','needed')"""
         ).fetchone()[0]
     status = "warn" if low > 0 else "ok"
     summary = f"{total} items · {low} low stock" if low > 0 else f"{total} items · {projects} projects"
@@ -181,7 +193,7 @@ def shopping_list():
             f"""{ITEM_SELECT}
                WHERE (i.threshold > 0 AND
                       i.quantity - COALESCE((SELECT SUM(ia.quantity_reserved) FROM item_assignments ia WHERE ia.item_id = i.id), 0) <= i.threshold)
-                  OR i.status IN ('low', 'ordered', 'depleted')
+                  OR i.status IN ('low', 'ordered', 'depleted', 'needed')
                ORDER BY i.name"""
         ).fetchall()
     return [item_row(r) for r in rows]
@@ -211,10 +223,12 @@ def create_item(body: ItemCreate):
     ts = now()
     with get_conn() as conn:
         conn.execute(
-            """INSERT INTO items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO items (id,name,category,subcategory,quantity,unit,location,status,threshold,specs,notes,created_at,updated_at,quantity_on_order)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (item_id, body.name, body.category, body.subcategory,
              body.quantity, body.unit, body.location, body.status,
-             body.threshold, json.dumps(body.specs), body.notes, ts, ts),
+             body.threshold, json.dumps(body.specs), body.notes, ts, ts,
+             body.quantity_on_order),
         )
         row = conn.execute(f"{ITEM_SELECT} WHERE i.id = ?", (item_id,)).fetchone()
     return item_row(row)

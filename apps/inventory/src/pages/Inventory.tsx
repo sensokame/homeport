@@ -9,6 +9,7 @@ const STATUS_VARIANTS: Record<ItemStatus, 'ok' | 'warn' | 'error' | 'default'> =
   low:      'warn',
   ordered:  'default',
   depleted: 'error',
+  needed:   'warn',
 }
 
 const BLANK: Partial<Item> = {
