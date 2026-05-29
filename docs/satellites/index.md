@@ -5,6 +5,10 @@ Satellites are the services homeport aggregates. Each is a standalone Docker con
 - **[Hub](hub.md)** — configuration, satellites.json format, env vars, API reference
 - **[Infrastructure](infra.md)** — Docker monitoring, system metrics, container actions
 - **[Inventory](inventory.md)** — equipment and project tracker, data model, API reference
+- **[Knowledge](knowledge.md)** — currently-reading books (Goodreads) + active Obsidian notes
+- **[Tasks](vikunja.md)** — Vikunja wrapper; due today, overdue, project count
+- **[Fitness](wger.md)** — wger wrapper; workout schedule and nutrition logging
+- **[Budget](actual.md)** — Actual Budget wrapper; monthly spend vs. budgeted
 
 ## Adding a third-party satellite
 

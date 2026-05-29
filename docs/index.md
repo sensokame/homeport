@@ -21,11 +21,12 @@ Adding a new domain means deploying a container and adding one line to `satellit
 |---|---|---|
 | [Infrastructure](satellites/infra.md) | First-party | Docker container monitoring — status, CPU, RAM, disk, actions |
 | [Inventory](satellites/inventory.md) | First-party | Equipment and project tracker with shopping list |
-| Quartz | Link card | Obsidian knowledge vault, served as a static site |
-| Vikunja | Link card | Self-hosted task management |
-| Actual Budget | Link card | Self-hosted finance tracking |
+| [Knowledge](satellites/knowledge.md) | First-party | Currently-reading books (Goodreads) + active Obsidian notes |
+| [Tasks](satellites/vikunja.md) | First-party | Vikunja wrapper — due today, overdue, project count |
+| [Fitness](satellites/wger.md) | First-party | wger wrapper — workout schedule and nutrition logging |
+| [Budget](satellites/actual.md) | First-party | Actual Budget wrapper — monthly spend vs. budgeted |
 
-First-party satellites expose a `GET /widget` endpoint. Third-party tools are link cards — no integration code, just a URL in `satellites.json`.
+First-party satellites expose a `GET /widget` endpoint and have their own UI. Third-party tools can be added as link cards — no integration code, just a URL in `satellites.json`.
 
 ---
 

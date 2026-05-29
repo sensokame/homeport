@@ -34,7 +34,11 @@ homeport/
 ├── packages/ui/        shared React component library
 ├── apps/hub/           hub app (frontend + backend)
 ├── apps/infra/         infrastructure satellite
-└── apps/inventory/     inventory satellite
+├── apps/inventory/     inventory satellite
+├── apps/obsidian/      knowledge satellite (Python only)
+├── apps/vikunja/       tasks satellite (Python only)
+├── apps/wger/          fitness satellite (Python only)
+└── apps/actual/        budget satellite (Node.js + React)
 ```
 
 See [Architecture](../architecture/index.md) for how the pieces fit together.

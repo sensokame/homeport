@@ -12,6 +12,10 @@
        │  GET /widget (internal Docker network)
        ├──────────────────► infra:8080
        ├──────────────────► inventory:8080
+       ├──────────────────► knowledge:8080
+       ├──────────────────► vikunja-sat:8080
+       ├──────────────────► wger-sat:8080
+       ├──────────────────► actual-sat:8080
        └──────────────────► (any future satellite)
 ```
 
@@ -87,8 +91,21 @@ homeport/
 │   │   ├── backend/         FastAPI + Docker SDK + psutil
 │   │   ├── src/             React frontend
 │   │   └── Dockerfile
-│   └── inventory/           Inventory satellite
-│       ├── backend/         FastAPI + SQLite
+│   ├── inventory/           Inventory satellite
+│   │   ├── backend/         FastAPI + SQLite
+│   │   ├── src/             React frontend
+│   │   └── Dockerfile
+│   ├── obsidian/            Knowledge satellite
+│   │   ├── backend/         FastAPI — reads vault + Goodreads RSS
+│   │   └── Dockerfile
+│   ├── vikunja/             Tasks satellite
+│   │   ├── backend/         FastAPI — Vikunja API wrapper
+│   │   └── Dockerfile
+│   ├── wger/                Fitness satellite
+│   │   ├── backend/         FastAPI — wger API wrapper
+│   │   └── Dockerfile
+│   └── actual/              Budget satellite
+│       ├── server/          Node.js + @actual-app/api
 │       ├── src/             React frontend
 │       └── Dockerfile
 ├── pnpm-workspace.yaml
