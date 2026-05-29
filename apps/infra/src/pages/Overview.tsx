@@ -14,8 +14,8 @@ interface OverviewProps {
 const GROUP_ORDER = ['orchestrator', 'public', 'internal'] as const
 const GROUP_LABELS: Record<string, string> = {
   orchestrator: 'Orchestrators',
-  public:       'Public — sensokame.com',
-  internal:     'Internal — station',
+  public:       'Public',
+  internal:     'Internal',
 }
 
 export default function Overview({ config }: OverviewProps) {
