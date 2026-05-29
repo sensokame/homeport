@@ -30,9 +30,10 @@ To build from source instead, see [Contributing](../contributing/index.md).
 
 ## Deploy the hub
 
-Create a `satellites.json` file (see [Hub](../satellites/hub.md) for the format), then:
+Create a `satellites.json` file (see [Hub](../satellites/hub.md) for the format), then save the following as `docker-compose.yml` and bring it up:
 
 ```yaml
+# docker-compose.yml
 services:
   hub:
     image: ghcr.io/sensokame/homeport-hub:latest
@@ -50,17 +51,28 @@ networks:
     external: true
 ```
 
+```bash
+docker compose up -d
+```
+
 The hub serves on port 8080. Point your reverse proxy at it.
 
 ---
 
 ## Deploy satellites
 
-Each satellite is independent — deploy only what you need.
+Each satellite is independent — deploy only what you need. For each one:
 
-**Infrastructure**
+1. Save the snippet below as `docker-compose.yml` in its own folder
+2. Run `docker compose up -d`
+3. Add the `satellites.json` entry to the hub's config
+
+---
+
+### Infrastructure
 
 ```yaml
+# docker-compose.yml
 services:
   infra:
     image: ghcr.io/sensokame/homeport-infra:latest
@@ -70,11 +82,28 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-**Inventory**
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "infra", "name": "Infrastructure", "url": "http://infra.station", "widget_url": "http://infra:8080/widget", "icon": "server" }
+```
+
+---
+
+### Inventory
 
 ```yaml
+# docker-compose.yml
 services:
   inventory:
     image: ghcr.io/sensokame/homeport-inventory:latest
@@ -84,11 +113,30 @@ services:
       - ./data:/data
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-**Knowledge** (requires an Obsidian vault mounted at `/vault`)
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "inventory", "name": "Inventory", "url": "http://inventory.station", "widget_url": "http://inventory:8080/widget", "icon": "package" }
+```
+
+---
+
+### Knowledge
+
+Requires an Obsidian vault on the host.
 
 ```yaml
+# docker-compose.yml
 services:
   knowledge:
     image: ghcr.io/sensokame/homeport-obsidian:latest
@@ -100,11 +148,30 @@ services:
       - GOODREADS_USER_ID=your_user_id
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-**Tasks** (requires a running Vikunja instance)
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "knowledge", "name": "Knowledge", "url": "http://quartz.station", "widget_url": "http://knowledge:8080/widget", "icon": "book-open" }
+```
+
+---
+
+### Tasks
+
+Requires a running Vikunja instance on the same Docker network.
 
 ```yaml
+# docker-compose.yml
 services:
   vikunja-sat:
     image: ghcr.io/sensokame/homeport-vikunja:latest
@@ -115,11 +182,30 @@ services:
       - VIKUNJA_TOKEN=your_token
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-**Fitness** (requires a running wger instance)
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "vikunja", "name": "Tasks", "url": "http://vikunja.station", "widget_url": "http://vikunja-sat:8080/widget", "icon": "check-square" }
+```
+
+---
+
+### Fitness
+
+Requires a running wger instance on the same Docker network.
 
 ```yaml
+# docker-compose.yml
 services:
   wger-sat:
     image: ghcr.io/sensokame/homeport-wger:latest
@@ -130,11 +216,30 @@ services:
       - WGER_TOKEN=your_token
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-**Budget** (requires a running Actual Budget instance)
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "wger", "name": "Fitness", "url": "http://wger.station", "widget_url": "http://wger-sat:8080/widget", "icon": "activity" }
+```
+
+---
+
+### Budget
+
+Requires a running Actual Budget instance on the same Docker network.
 
 ```yaml
+# docker-compose.yml
 services:
   actual-sat:
     image: ghcr.io/sensokame/homeport-actual:latest
@@ -146,6 +251,20 @@ services:
       - ACTUAL_BUDGET_ID=your_budget_id
     networks:
       - proxy-network
+
+networks:
+  proxy-network:
+    external: true
+```
+
+```bash
+docker compose up -d
+```
+
+Add to `satellites.json`:
+
+```json
+{ "id": "budget", "name": "Finances", "url": "http://budget.station", "widget_url": "http://actual-sat:8080/widget", "icon": "dollar-sign" }
 ```
 
 ---
