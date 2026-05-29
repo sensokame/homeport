@@ -24,15 +24,16 @@ def load_satellites() -> list[dict]:
 
 async def fetch_widget(client: httpx.AsyncClient, sat: dict) -> dict:
     widget_url = sat.get("widget_url")
+    public = {k: v for k, v in sat.items() if k != "widget_url"}
     if not widget_url:
-        return {**sat, "widget": None}
+        return {**public, "widget": None}
     try:
         r = await client.get(widget_url)
         r.raise_for_status()
-        return {**sat, "widget": r.json()}
+        return {**public, "widget": r.json()}
     except Exception:
         return {
-            **sat,
+            **public,
             "widget": {
                 "status": "error",
                 "title": sat["name"],

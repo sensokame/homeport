@@ -35,7 +35,6 @@ interface Satellite {
   name: string
   url: string
   icon?: string
-  widget_url?: string
   widget: WidgetData | null
 }
 
