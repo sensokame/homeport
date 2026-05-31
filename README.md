@@ -8,13 +8,13 @@ A self-hosted personal hub. Aggregates independent **satellite** services into o
 
 ## How it works
 
-The hub reads `satellites.json` and renders a card grid. Each satellite is a standalone Docker container that exposes `GET /widget`. Adding a new domain = deploy a container + one line in `satellites.json`. The hub never changes.
+The hub reads `dashboard.json` and renders a configurable tab dashboard. Each satellite is a standalone Docker container. Adding a new domain = deploy a container + one entry in `dashboard.json`. The hub never changes.
 
 ## Apps
 
 | App | Description |
 |---|---|
-| `apps/hub` | Hub — aggregates satellites into a card grid |
+| `apps/hub` | Hub — aggregates satellites into a tabbed widget dashboard |
 | `apps/infra` | Infrastructure satellite — Docker monitoring, system metrics, container actions |
 | `apps/inventory` | Inventory satellite — equipment and project tracker with shopping list |
 | `apps/obsidian` | Knowledge satellite — currently-reading books (Goodreads) + active Obsidian notes |

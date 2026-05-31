@@ -80,6 +80,31 @@ Base surface card. Accepts an optional status border tint and click handler.
 | `onClick` | `() => void` | Makes the card clickable |
 | `children` | `ReactNode` | Card content |
 
+### SwipeableCard
+
+Shell for widgets that have a home view and one or more detail pages. Pages are plain React nodes — they can be `Card` components, lists of cards, charts, anything.
+
+```tsx
+<SwipeableCard
+  status="ok"
+  home={<TaskSummaryCard tasks={tasks} />}
+  pages={[
+    <ProjectCard project="homeport" tasks={hpTasks} />,
+    <ProjectCard project="robot-car" tasks={rcTasks} />,
+  ]}
+/>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `home` | `ReactNode` | Default view, always shown first |
+| `pages` | `ReactNode[]` | Detail pages, navigated by swipe or dot click |
+| `status` | `ok \| warn \| error` | Tints the left border |
+
+Dot indicators show current position. A home button appears on detail pages. Do not nest `SwipeableCard` inside a page — gesture conflicts make the UX unusable.
+
+See the [Widget System](../widgets/index.md) docs for how `SwipeableCard` fits into the widget model.
+
 ### WidgetCard
 
 Renders a satellite widget: status dot, title, summary, metrics, and an "open →" link.

@@ -70,4 +70,4 @@ networks:
     external: true
 ```
 
-The satellite container name (`wger-sat`) is what you reference in `satellites.json` as the `widget_url` host.
+The satellite container name (`wger-sat`) is what you reference in `dashboard.json` as the `widgetUrl` host (e.g. `"widgetUrl": "http://wger-sat:8080"`).

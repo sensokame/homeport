@@ -31,8 +31,9 @@
 
 ```
 homeport/
-├── packages/ui/        shared React component library
+├── packages/ui/        shared React component library (@homeport/ui)
 ├── apps/hub/           hub app (frontend + backend)
+├── apps/workspace/     workspace satellite — first party, optional (React only)
 ├── apps/infra/         infrastructure satellite
 ├── apps/inventory/     inventory satellite
 ├── apps/obsidian/      knowledge satellite (Python only)
@@ -42,6 +43,15 @@ homeport/
 ```
 
 See [Architecture](../architecture/index.md) for how the pieces fit together.
+
+## Contributor mindset
+
+homeport is headed toward open source. When adding features or designing interfaces, think from the perspective of an external contributor who doesn't know your specific setup:
+
+- **Is the contract self-contained?** A satellite author shouldn't need to know internal hub details to implement `WidgetProps` correctly.
+- **Are IDs and values generic?** Don't design config schemas that only make sense with specific service instances — use label-based or tag-based filtering so any deployment can use it.
+- **Is it optional?** New first party satellites (like `workspace-sat`) should be deployable independently. The hub works without them.
+- **Does `@homeport/ui` provide the building blocks?** Custom UI should be composable from existing primitives before reaching for new ones.
 
 ## Adding a New Satellite
 
@@ -54,7 +64,7 @@ See [Architecture](../architecture/index.md) for how the pieces fit together.
    └── docker-compose.yml
    ```
 2. Implement the [widget protocol](../architecture/index.md#widget-protocol)
-3. Add to `apps/hub/satellites.json`
+3. Add a satellite entry and widget instance to `apps/hub/dashboard.json`
 4. Add a doc page at `docs/satellites/<name>.md`
 
 ## Adding a Component to @homeport/ui

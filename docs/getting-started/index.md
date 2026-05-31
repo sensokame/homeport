@@ -30,7 +30,17 @@ To build from source instead, see [Contributing](../contributing/index.md).
 
 ## Deploy the hub
 
-Create a `satellites.json` file (see [Hub](../satellites/hub.md) for the format), then save the following as `docker-compose.yml` and bring it up:
+Create a `dashboard.json` file (see [Hub](../satellites/hub.md) for the full format), then save the following as `docker-compose.yml` and bring it up:
+
+```json
+{
+  "version": 2,
+  "satellites": [],
+  "tabs": [
+    { "id": "overview", "label": "Overview", "widgets": [] }
+  ]
+}
+```
 
 ```yaml
 # docker-compose.yml
@@ -40,7 +50,7 @@ services:
     container_name: hub
     restart: unless-stopped
     volumes:
-      - ./satellites.json:/app/satellites.json:ro
+      - ./dashboard.json:/app/dashboard.json
     environment:
       - HOSTNAME_DISPLAY=station
     networks:
@@ -65,7 +75,7 @@ Each satellite is independent — deploy only what you need. For each one:
 
 1. Save the snippet below as `docker-compose.yml` in its own folder
 2. Run `docker compose up -d`
-3. Add the `satellites.json` entry to the hub's config
+3. Add the satellite to `dashboard.json`
 
 ---
 
@@ -92,10 +102,14 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "infra", "name": "Infrastructure", "url": "http://infra.station", "widget_url": "http://infra:8080/widget", "icon": "server" }
+// satellites array
+{ "id": "infra", "url": "http://infra.station", "widgetUrl": "http://infra:8080" }
+
+// widgets array in a tab
+{ "instanceId": "infra-main", "widgetId": "legacy.widget", "satelliteId": "infra", "config": { "icon": "server" } }
 ```
 
 ---
@@ -123,10 +137,14 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "inventory", "name": "Inventory", "url": "http://inventory.station", "widget_url": "http://inventory:8080/widget", "icon": "package" }
+// satellites array
+{ "id": "inventory", "url": "http://inventory.station", "widgetUrl": "http://inventory:8080" }
+
+// widgets array in a tab
+{ "instanceId": "inventory-main", "widgetId": "legacy.widget", "satelliteId": "inventory", "config": { "icon": "package" } }
 ```
 
 ---
@@ -158,10 +176,14 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "knowledge", "name": "Knowledge", "url": "http://quartz.station", "widget_url": "http://knowledge:8080/widget", "icon": "book-open" }
+// satellites array
+{ "id": "knowledge", "url": "http://quartz.station", "widgetUrl": "http://knowledge:8080" }
+
+// widgets array in a tab
+{ "instanceId": "knowledge-main", "widgetId": "legacy.widget", "satelliteId": "knowledge", "config": { "icon": "book-open" } }
 ```
 
 ---
@@ -192,10 +214,14 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "vikunja", "name": "Tasks", "url": "http://vikunja.station", "widget_url": "http://vikunja-sat:8080/widget", "icon": "check-square" }
+// satellites array
+{ "id": "vikunja", "url": "http://vikunja.station", "widgetUrl": "http://vikunja-sat:8080" }
+
+// widgets array in a tab
+{ "instanceId": "vikunja-main", "widgetId": "legacy.widget", "satelliteId": "vikunja", "config": { "icon": "check-square" } }
 ```
 
 ---
@@ -226,10 +252,14 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "wger", "name": "Fitness", "url": "http://wger.station", "widget_url": "http://wger-sat:8080/widget", "icon": "activity" }
+// satellites array
+{ "id": "wger", "url": "http://wger.station", "widgetUrl": "http://wger-sat:8080" }
+
+// widgets array in a tab
+{ "instanceId": "wger-main", "widgetId": "legacy.widget", "satelliteId": "wger", "config": { "icon": "activity" } }
 ```
 
 ---
@@ -261,28 +291,61 @@ networks:
 docker compose up -d
 ```
 
-Add to `satellites.json`:
+Add to `dashboard.json`:
 
 ```json
-{ "id": "budget", "name": "Finances", "url": "http://budget.station", "widget_url": "http://actual-sat:8080/widget", "icon": "dollar-sign" }
+// satellites array
+{ "id": "budget", "url": "http://budget.station", "widgetUrl": "http://actual-sat:8080" }
+
+// widgets array in a tab
+{ "instanceId": "budget-main", "widgetId": "legacy.widget", "satelliteId": "budget", "config": { "icon": "dollar-sign" } }
 ```
 
 ---
 
-## Add a third-party link card
+### Workspace (optional)
 
-No code needed. Add an entry without `widget_url` to `satellites.json`:
+Deploy this if you want workflow widgets — swipeable cards that combine multiple satellite widgets into a project-scoped view. See [Workspace](../satellites/workspace.md) for configuration.
 
-```json
-{
-  "id": "notes",
-  "name": "Notes",
-  "url": "http://quartz.station",
-  "icon": "book"
-}
+```yaml
+# docker-compose.yml
+services:
+  workspace-sat:
+    image: ghcr.io/sensokame/homeport-workspace:latest
+    container_name: workspace-sat
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
 ```
 
-The hub renders a link card with an "open →" button.
+```bash
+docker compose up -d
+```
+
+Add to `dashboard.json`:
+
+```json
+// satellites array
+{ "id": "workspace", "url": "", "widgetUrl": "http://workspace-sat:8080" }
+
+// widgets array in a tab (one instance per workflow you want)
+{
+  "instanceId": "workspace-my-project",
+  "widgetId": "workspace.panel",
+  "satelliteId": "workspace",
+  "config": {
+    "label": "My Project",
+    "context": { "tags": ["my-project"] },
+    "slots": [
+      { "satelliteId": "vikunja", "widgetId": "vikunja.project-focus", "config": { "project_id": 1 } }
+    ]
+  }
+}
+```
 
 ---
 

@@ -1,44 +1,36 @@
 import { useState, useEffect, useCallback } from 'react'
-import { NavBar, WidgetCard, LinkCard } from '@homeport/ui'
-import type { WidgetData } from '@homeport/ui'
-import {
-  Book, BookOpen, CheckSquare, DollarSign, Server, Package,
-  Globe, Database, Folder, Settings, Activity, type LucideProps,
-} from 'lucide-react'
+import { NavBar } from '@homeport/ui'
+import { registry } from './registry'
+import { TabBar } from './components/TabBar'
+import { SettingsDrawer } from './components/SettingsDrawer'
+import { WidgetShell } from './components/WidgetShell'
 import styles from './App.module.css'
 
-type IconName = string
-type IconComponent = React.ComponentType<LucideProps>
-
-const ICON_MAP: Record<string, IconComponent> = {
-  'book':         Book,
-  'book-open':    BookOpen,
-  'check-square': CheckSquare,
-  'dollar-sign':  DollarSign,
-  'server':       Server,
-  'package':      Package,
-  'globe':        Globe,
-  'database':     Database,
-  'folder':       Folder,
-  'settings':     Settings,
-  'activity':     Activity,
-}
-
-function resolveIcon(name: IconName | undefined) {
-  if (!name) return undefined
-  const Icon = ICON_MAP[name]
-  return Icon ? <Icon size={20} strokeWidth={1.5} /> : undefined
-}
-
-interface Satellite {
+interface SatelliteEntry {
   id: string
-  name: string
   url: string
-  icon?: string
-  widget: WidgetData | null
 }
 
-interface Config {
+interface WidgetInstance {
+  instanceId: string
+  widgetId: string
+  satelliteId: string
+  config: Record<string, unknown>
+}
+
+interface TabEntry {
+  id: string
+  label: string
+  widgets: WidgetInstance[]
+}
+
+interface DashboardConfig {
+  version: number
+  satellites: SatelliteEntry[]
+  tabs: TabEntry[]
+}
+
+interface AppConfig {
   hostname: string
   version: string
 }
@@ -48,21 +40,22 @@ function fmtTime(d: Date) {
 }
 
 export default function App() {
-  const [config, setConfig] = useState<Config | null>(null)
-  const [satellites, setSatellites] = useState<Satellite[]>([])
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
+  const [dashboard, setDashboard] = useState<DashboardConfig | null>(null)
+  const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [clock, setClock] = useState(() => fmtTime(new Date()))
 
   const fetchData = useCallback(async () => {
     try {
-      const [cfg, sats] = await Promise.all([
+      const [cfg, dash] = await Promise.all([
         fetch('/api/config').then(r => r.json()),
-        fetch('/api/satellites').then(r => r.json()),
+        fetch('/api/dashboard').then(r => r.json()),
       ])
-      setConfig(cfg)
-      setSatellites(sats)
-      setLastUpdated(new Date())
+      setAppConfig(cfg)
+      setDashboard(dash)
+      setActiveTabId(prev => prev ?? dash.tabs[0]?.id ?? null)
     } finally {
       setLoading(false)
     }
@@ -70,8 +63,6 @@ export default function App() {
 
   useEffect(() => {
     fetchData()
-    const timer = setInterval(fetchData, 30_000)
-    return () => clearInterval(timer)
   }, [fetchData])
 
   useEffect(() => {
@@ -79,67 +70,89 @@ export default function App() {
     return () => clearInterval(timer)
   }, [])
 
-  const widgetSats = satellites.filter(s => s.widget !== null)
-  const linkSats = satellites.filter(s => s.widget === null)
+  async function handleRemoveWidget(tabId: string, instanceId: string) {
+    if (!dashboard) return
+    const updated: DashboardConfig = {
+      ...dashboard,
+      tabs: dashboard.tabs.map(tab =>
+        tab.id === tabId
+          ? { ...tab, widgets: tab.widgets.filter(w => w.instanceId !== instanceId) }
+          : tab
+      ),
+    }
+    setDashboard(updated)
+    await fetch('/api/dashboard', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+  }
 
-  const statusCounts = widgetSats.reduce(
-    (acc, s) => { acc[s.widget!.status] = (acc[s.widget!.status] ?? 0) + 1; return acc },
-    { ok: 0, warn: 0, error: 0 } as Record<string, number>
-  )
+  const activeTab = dashboard?.tabs.find(t => t.id === activeTabId) ?? null
+  const satMap = Object.fromEntries((dashboard?.satellites ?? []).map(s => [s.id, s]))
 
   return (
     <div className={styles.root}>
-      <NavBar hostname={config?.hostname ?? '…'} />
+      <NavBar hostname={appConfig?.hostname ?? '…'} />
       <div className={styles.hero}>
         <div className={styles.heroInner}>
           <p className={styles.heroSub}>
-            home server{config?.version ? ` · v${config.version}` : ''}
+            home server{appConfig?.version ? ` · v${appConfig.version}` : ''}
           </p>
-          {!loading && widgetSats.length > 0 && (
-            <div className={styles.heroRight}>
-              <div className={styles.statusRow}>
-                <span className={`${styles.badge} ${styles.badgeOk}`}>● {statusCounts.ok} ok</span>
-                <span className={`${styles.badge} ${styles.badgeWarn}`}>⚠ {statusCounts.warn} warn</span>
-                <span className={`${styles.badge} ${styles.badgeError}`}>✕ {statusCounts.error} error</span>
-              </div>
-              <p className={styles.clock}>{clock}</p>
-              {lastUpdated && (
-                <p className={styles.updated}>refreshed {fmtTime(lastUpdated)} · every 30s</p>
-              )}
-            </div>
-          )}
+          <div className={styles.heroRight}>
+            <p className={styles.clock}>{clock}</p>
+          </div>
         </div>
       </div>
+      {dashboard && dashboard.tabs.length > 0 && (
+        <TabBar
+          tabs={dashboard.tabs}
+          activeId={activeTabId ?? dashboard.tabs[0].id}
+          onSelect={setActiveTabId}
+          onSettingsOpen={() => setSettingsOpen(true)}
+        />
+      )}
       <main className={styles.main}>
         {loading ? (
           <p className={styles.muted}>loading…</p>
-        ) : satellites.length === 0 ? (
-          <p className={styles.muted}>No satellites configured. Edit satellites.json to add services.</p>
+        ) : !activeTab || activeTab.widgets.length === 0 ? (
+          <p className={styles.muted}>No widgets on this tab. Open settings to add some.</p>
         ) : (
           <div className={styles.content}>
-            {widgetSats.length > 0 && (
-              <section>
-                {linkSats.length > 0 && <h2 className={styles.sectionTitle}>Services</h2>}
-                <div className={styles.grid}>
-                  {widgetSats.map(sat => (
-                    <WidgetCard key={sat.id} data={sat.widget as WidgetData} url={sat.url} icon={resolveIcon(sat.icon)} />
-                  ))}
-                </div>
-              </section>
-            )}
-            {linkSats.length > 0 && (
-              <section>
-                {widgetSats.length > 0 && <h2 className={styles.sectionTitle}>Links</h2>}
-                <div className={`${styles.grid} ${styles.gridCompact}`}>
-                  {linkSats.map(sat => (
-                    <LinkCard key={sat.id} name={sat.name} url={sat.url} icon={resolveIcon(sat.icon)} />
-                  ))}
-                </div>
-              </section>
-            )}
+            <div className={styles.grid}>
+              {activeTab.widgets.map(instance => {
+                const manifest = registry[instance.widgetId]
+                if (!manifest) {
+                  return (
+                    <div key={instance.instanceId} className={styles.missingWidget}>
+                      Unknown widget: {instance.widgetId}
+                    </div>
+                  )
+                }
+                const sat = satMap[instance.satelliteId]
+                return (
+                  <WidgetShell
+                    key={instance.instanceId}
+                    manifest={manifest}
+                    instance={instance}
+                    satelliteUrl={`/api/proxy/${instance.satelliteId}`}
+                    publicUrl={sat?.url ?? ''}
+                  />
+                )
+              })}
+            </div>
           </div>
         )}
       </main>
+      {dashboard && (
+        <SettingsDrawer
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          tabs={dashboard.tabs}
+          registry={registry}
+          onRemoveWidget={handleRemoveWidget}
+        />
+      )}
     </div>
   )
 }

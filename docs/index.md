@@ -9,9 +9,9 @@ A self-hosted personal hub for technical users. Aggregates independent **satelli
 
 ## What it is
 
-Homeport is a pure aggregation layer. The **hub** reads from independent satellite containers and renders a card grid. Each satellite is a standalone service — usable without homeport, independently deployable, and independently removable.
+Homeport is a pure aggregation layer. The **hub** reads from independent satellite containers and renders a configurable tab dashboard. Each satellite is a standalone service — usable without homeport, independently deployable, and independently removable.
 
-Adding a new domain means deploying a container and adding one line to `satellites.json`. The hub never needs to change.
+Adding a new domain means deploying a container and adding one entry to `dashboard.json`. The hub never needs to change.
 
 ---
 
@@ -26,7 +26,7 @@ Adding a new domain means deploying a container and adding one line to `satellit
 | [Fitness](satellites/wger.md) | First-party | wger wrapper — workout schedule and nutrition logging |
 | [Budget](satellites/actual.md) | First-party | Actual Budget wrapper — monthly spend vs. budgeted |
 
-First-party satellites expose a `GET /widget` endpoint and have their own UI. Third-party tools can be added as link cards — no integration code, just a URL in `satellites.json`.
+First-party satellites expose a `GET /widget` endpoint and their own UI. Any service with a public URL can be added as a link card in `dashboard.json`.
 
 ---
 

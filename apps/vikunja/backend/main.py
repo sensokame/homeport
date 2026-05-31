@@ -59,6 +59,13 @@ def fetch_projects():
     return [p for p in projects if not p.get("is_archived")]
 
 
+def is_waiting(task: dict) -> bool:
+    return any(
+        lbl.get("title", "").lower() == "waiting"
+        for lbl in (task.get("labels") or [])
+    )
+
+
 @app.get("/widget")
 def widget():
     try:
@@ -75,6 +82,7 @@ def widget():
     today = date.today()
     due_today = [t for t in tasks if parse_due(t.get("due_date")) == today]
     overdue = [t for t in tasks if (d := parse_due(t.get("due_date"))) and d < today]
+    blocked = [t for t in tasks if is_waiting(t)]
 
     status = "warn" if overdue else "ok"
     parts = []
@@ -82,6 +90,8 @@ def widget():
         parts.append(f"{len(due_today)} due today")
     if overdue:
         parts.append(f"{len(overdue)} overdue")
+    if blocked:
+        parts.append(f"{len(blocked)} blocked")
     summary = " · ".join(parts) if parts else "All clear"
 
     return {
@@ -91,6 +101,7 @@ def widget():
         "metrics": [
             {"label": "Due today", "value": len(due_today)},
             {"label": "Overdue", "value": len(overdue), "alert": len(overdue) > 0},
+            {"label": "Blocked", "value": len(blocked), "alert": len(blocked) > 0},
             {"label": "Projects", "value": len(projects)},
         ],
     }
@@ -113,6 +124,7 @@ def get_tasks():
             "due_date": due.isoformat() if due else None,
             "is_today": due == today,
             "is_overdue": due is not None and due < today,
+            "is_waiting": is_waiting(t),
             "priority": t.get("priority", 0),
         })
     return result
@@ -124,19 +136,57 @@ def get_projects():
     tasks = fetch_tasks()
 
     task_counts: dict[int, int] = {}
+    blocked_counts: dict[int, int] = {}
     for t in tasks:
         pid = t.get("project_id")
         if pid:
             task_counts[pid] = task_counts.get(pid, 0) + 1
+            if is_waiting(t):
+                blocked_counts[pid] = blocked_counts.get(pid, 0) + 1
 
     return [
         {
             "id": p["id"],
             "title": p["title"],
             "task_count": task_counts.get(p["id"], 0),
+            "blocked_count": blocked_counts.get(p["id"], 0),
         }
         for p in projects
     ]
+
+
+@app.get("/api/blocked")
+def get_blocked():
+    tasks = fetch_tasks()
+    projects = {p["id"]: p["title"] for p in fetch_projects()}
+
+    waiting_tasks = [t for t in tasks if is_waiting(t)]
+
+    by_project: dict[str, list] = {}
+    for t in waiting_tasks:
+        project_name = projects.get(t.get("project_id"), "Inbox")
+        if project_name not in by_project:
+            by_project[project_name] = []
+
+        desc = t.get("description", "") or ""
+        waiting_for = None
+        for line in desc.splitlines():
+            if line.lower().startswith("waiting for:"):
+                waiting_for = line[len("waiting for:"):].strip()
+                break
+
+        by_project[project_name].append({
+            "id": t["id"],
+            "title": t["title"],
+            "waiting_for": waiting_for,
+        })
+
+    return {
+        "blocked": [
+            {"project": project, "count": len(items), "tasks": items}
+            for project, items in by_project.items()
+        ]
+    }
 
 
 @app.get("/health")

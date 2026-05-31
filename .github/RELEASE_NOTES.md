@@ -1,72 +1,43 @@
-## homeport v0.1.0
+## homeport v0.2.0
 
-First release. A self-hosted personal hub that aggregates independent satellite services into a single dashboard — no lock-in, no domain logic.
+Widget system overhaul. The hub now renders rich, interactive widget components instead of flat data cards — and every widget gets consistent chrome provided by the hub.
 
 ---
 
-### What's included
+### What's new
 
-**Hub**
-- Card grid dashboard — live widget cards for first-party satellites, link cards for third-party tools
-- Reads `satellites.json` at runtime — add or remove services without rebuilding
-- Server-side widget fetching — satellites stay off the public internet
-- Auto-refreshes every 30 seconds
+**Widget system (Phases 3 + 4)**
 
-**Infrastructure satellite**
-- Live container status, CPU, RAM, disk per container
-- Container detail view — ports, mounts, networks, live stats
-- Actions: start, stop, restart, redeploy per container and per group
-- Restart all / Update all (pull + recreate only changed images)
+- **`WidgetShell`** — the hub wraps every widget in a shell that provides a status indicator, icon, satellite name, and `open →` link. Widgets focus purely on data and layout.
+- **`fullScreen` manifest flag** — widgets that manage their own chrome can opt out of the shell entirely.
+- **`onStatusChange` callback** — widgets report their ok/warn/error status to the shell via a prop callback; no extra API call needed.
 
-**Inventory satellite**
-- Equipment and project tracker with SQLite storage
-- Items with category, quantity, location, status, and restock threshold
-- Project assignments with reserved quantities
-- Shopping list — items at or below threshold, or marked as needed/depleted/ordered
+**Tasks widget (`vikunja.task-overview`)**
 
-**Knowledge satellite**
-- Currently-reading books via Goodreads public RSS feed
-- Falls back to Obsidian vault frontmatter (`status: reading`) when Goodreads is unavailable
-- Active notes count (vault files modified in the last 7 days)
+- Replaces the flat summary card with a swipeable widget
+- Home page: "Overview" — total open tasks, due today, overdue, blocked counts
+- Per-project pages: swipe to see each project's full task list
+- Overdue tasks highlighted; blocked/waiting tasks badged
 
-**Tasks satellite**
-- Wraps a self-hosted Vikunja instance
-- Shows tasks due today, overdue count, and project list
+**Blocked task tracking**
 
-**Fitness satellite**
-- Wraps a self-hosted wger instance
-- Shows today's workout status (scheduled / logged / rest day), active routine, and meals logged
+- Tasks labelled `waiting` in Vikunja are surfaced as blocked items
+- Task description `waiting for: <what>` is parsed and shown in the widget
+- Satellite exposes `GET /api/blocked` — waiting tasks grouped by project with parsed reason
 
-**Budget satellite**
-- Wraps a self-hosted Actual Budget instance
-- Shows monthly spend vs. budgeted across expense categories, and flags over-budget categories
+**`SwipeableCard` improvements**
+
+- Now content-only (no Card wrapper) — the shell provides the card
+- Navigation: `← home` button + `‹ · dots · ›` arrows flanking the dot indicators
+- `overflow: hidden` scoped to the slide track only — fixes nav visibility bug
 
 ---
 
 ### Docker images
 
-All images are published to the GitHub Container Registry:
-
 ```
-ghcr.io/sensokame/homeport-hub:0.1.0
-ghcr.io/sensokame/homeport-infra:0.1.0
-ghcr.io/sensokame/homeport-inventory:0.1.0
-ghcr.io/sensokame/homeport-obsidian:0.1.0
-ghcr.io/sensokame/homeport-vikunja:0.1.0
-ghcr.io/sensokame/homeport-wger:0.1.0
-ghcr.io/sensokame/homeport-actual:0.1.0
+ghcr.io/sensokame/homeport-hub:0.2.0
+ghcr.io/sensokame/homeport-vikunja:0.2.0
 ```
 
-See the [Getting Started guide](https://sensokame.github.io/homeport/getting-started/) for deployment instructions.
-
----
-
-### Stack
-
-| Layer | Tech |
-|---|---|
-| Monorepo | pnpm workspaces |
-| Frontend | React + TypeScript + Vite |
-| Shared UI | `@homeport/ui` — React components + CSS tokens |
-| Backend | FastAPI (Python) or Node.js per satellite |
-| Database | SQLite per data-bearing satellite |
+Other satellite images are unchanged from v0.1.0.

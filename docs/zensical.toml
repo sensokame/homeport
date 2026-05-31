@@ -8,6 +8,7 @@ nav = [
   {"Home" = "index.md"},
   {"Getting Started" = "getting-started/index.md"},
   {"Architecture" = "architecture/index.md"},
+  {"Widget System" = "widgets/index.md"},
   {"Satellites" = "satellites/index.md"},
   {"Satellite: Hub" = "satellites/hub.md"},
   {"Satellite: Infrastructure" = "satellites/infra.md"},

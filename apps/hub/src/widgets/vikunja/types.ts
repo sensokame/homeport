@@ -1,4 +1,4 @@
-export interface Task {
+export interface VTask {
   id: number
   title: string
   project_id: number
@@ -10,7 +10,7 @@ export interface Task {
   priority: number
 }
 
-export interface Project {
+export interface VProject {
   id: number
   title: string
   task_count: number

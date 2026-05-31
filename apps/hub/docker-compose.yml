@@ -8,7 +8,7 @@ services:
     labels:
       homeport.group: internal
     volumes:
-      - ./satellites.json:/app/satellites.json:ro
+      - ./dashboard.json:/app/dashboard.json
     environment:
       - HOSTNAME_DISPLAY=station
     networks:

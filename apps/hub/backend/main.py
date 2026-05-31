@@ -1,46 +1,28 @@
-import asyncio
 import json
 import os
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-SATELLITES_PATH = Path(os.getenv("SATELLITES_PATH", "/app/satellites.json"))
+DASHBOARD_PATH = Path(os.getenv("DASHBOARD_PATH", "/app/dashboard.json"))
 STATIC_DIR = Path(__file__).parent / "static"
 VERSION = "0.1.0"
 
 app = FastAPI()
 
 
-def load_satellites() -> list[dict]:
-    if not SATELLITES_PATH.exists():
-        print(f"Warning: satellites.json not found at {SATELLITES_PATH}")
-        return []
-    return json.loads(SATELLITES_PATH.read_text())
+def load_dashboard() -> dict:
+    if not DASHBOARD_PATH.exists():
+        print(f"Warning: dashboard.json not found at {DASHBOARD_PATH}")
+        return {"version": 2, "satellites": [], "tabs": []}
+    return json.loads(DASHBOARD_PATH.read_text())
 
 
-async def fetch_widget(client: httpx.AsyncClient, sat: dict) -> dict:
-    widget_url = sat.get("widget_url")
-    public = {k: v for k, v in sat.items() if k != "widget_url"}
-    if not widget_url:
-        return {**public, "widget": None}
-    try:
-        r = await client.get(widget_url)
-        r.raise_for_status()
-        return {**public, "widget": r.json()}
-    except Exception:
-        return {
-            **public,
-            "widget": {
-                "status": "error",
-                "title": sat["name"],
-                "summary": "unreachable",
-                "metrics": [],
-            },
-        }
+def save_dashboard(data: dict):
+    DASHBOARD_PATH.write_text(json.dumps(data, indent=2))
 
 
 @app.get("/api/config")
@@ -51,12 +33,49 @@ def get_config():
     }
 
 
-@app.get("/api/satellites")
-async def get_satellites():
-    satellites = load_satellites()
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        results = await asyncio.gather(*(fetch_widget(client, s) for s in satellites))
-    return list(results)
+@app.get("/api/dashboard")
+def get_dashboard():
+    data = load_dashboard()
+    # Strip internal widgetUrl before sending to browser
+    public_sats = [{k: v for k, v in s.items() if k != "widgetUrl"} for s in data.get("satellites", [])]
+    return {**data, "satellites": public_sats}
+
+
+@app.put("/api/dashboard")
+async def put_dashboard(request: Request):
+    body = await request.json()
+    existing = load_dashboard()
+    # Preserve widgetUrl values — client never sees them so can't send them back
+    sat_map = {s["id"]: s.get("widgetUrl") for s in existing.get("satellites", [])}
+    merged_sats = []
+    for s in body.get("satellites", []):
+        widget_url = sat_map.get(s["id"])
+        merged_sats.append({**s, **({"widgetUrl": widget_url} if widget_url else {})})
+    save_dashboard({**body, "satellites": merged_sats})
+    return {"ok": True}
+
+
+@app.api_route("/api/proxy/{satellite_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy(satellite_id: str, path: str, request: Request):
+    data = load_dashboard()
+    sat = next((s for s in data.get("satellites", []) if s["id"] == satellite_id), None)
+    if not sat or not sat.get("widgetUrl"):
+        raise HTTPException(status_code=404, detail=f"Satellite '{satellite_id}' not found")
+    target = sat["widgetUrl"].rstrip("/") + "/" + path
+    if request.url.query:
+        target += "?" + request.url.query
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        upstream = await client.request(
+            method=request.method,
+            url=target,
+            headers={k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")},
+            content=await request.body(),
+        )
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers=dict(upstream.headers),
+    )
 
 
 if STATIC_DIR.exists():
