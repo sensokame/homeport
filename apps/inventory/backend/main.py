@@ -184,6 +184,28 @@ def widget():
     }
 
 
+# ── Widget endpoints ──────────────────────────────────────────────────────────
+
+@app.get("/api/widget/projects")
+def widget_projects():
+    with get_conn() as conn:
+        projects = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
+        result = []
+        for p in projects:
+            assignments = conn.execute(
+                """SELECT ia.item_id, i.name AS item_name, i.status AS item_status,
+                          ia.quantity_reserved, i.unit, ia.notes
+                   FROM item_assignments ia
+                   JOIN items i ON i.id = ia.item_id
+                   WHERE ia.project_id = ? AND i.status != 'in_stock'
+                   ORDER BY i.name""",
+                (p["id"],),
+            ).fetchall()
+            if assignments:
+                result.append({**dict(p), "assignments": [dict(a) for a in assignments]})
+    return result
+
+
 # ── Items ─────────────────────────────────────────────────────────────────────
 
 @app.get("/api/items/shopping-list")

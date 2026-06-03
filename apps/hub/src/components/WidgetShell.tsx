@@ -9,17 +9,23 @@ interface WidgetShellProps {
   instance: { config: Record<string, unknown> }
   satelliteUrl: string
   publicUrl: string
+  onStatusChange?: (status: 'ok' | 'warn' | 'error') => void
 }
 
-export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl }: WidgetShellProps) {
+export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange }: WidgetShellProps) {
   const [status, setStatus] = useState<'ok' | 'warn' | 'error'>('ok')
+
+  const handleStatusChange = (s: 'ok' | 'warn' | 'error') => {
+    setStatus(s)
+    onParentStatusChange?.(s)
+  }
 
   const Widget = manifest.component
   const widgetProps: WidgetProps = {
     config: instance.config,
     satelliteUrl,
     publicUrl,
-    onStatusChange: setStatus,
+    onStatusChange: handleStatusChange,
   }
 
   if (manifest.fullScreen) {

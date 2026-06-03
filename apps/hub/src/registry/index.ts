@@ -2,6 +2,7 @@ import type { WidgetManifest } from '@homeport/ui'
 import { LegacyWidget } from '../components/LegacyWidget'
 import { TaskOverviewWidget } from '../widgets/vikunja/TaskOverviewWidget'
 import { ProjectFocusWidget } from '../widgets/vikunja/ProjectFocusWidget'
+import { InventoryOverviewWidget } from '../widgets/inventory/InventoryOverviewWidget'
 
 export const registry: Record<string, WidgetManifest> = {
   'legacy.widget': {
@@ -13,6 +14,13 @@ export const registry: Record<string, WidgetManifest> = {
     },
     component: LegacyWidget,
     fullScreen: true,
+  },
+  'inventory.overview': {
+    id: 'inventory.overview',
+    name: 'Inventory',
+    description: 'Stock overview and per-project item needs',
+    configSchema: {},
+    component: InventoryOverviewWidget,
   },
   'vikunja.task-overview': {
     id: 'vikunja.task-overview',

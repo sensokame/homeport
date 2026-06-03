@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { NavBar } from '@homeport/ui'
+import { NavBar, StatusDot } from '@homeport/ui'
 import { registry } from './registry'
 import { TabBar } from './components/TabBar'
 import { SettingsDrawer } from './components/SettingsDrawer'
@@ -46,6 +46,11 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState(() => fmtTime(new Date()))
+  const [widgetStatuses, setWidgetStatuses] = useState<Record<string, 'ok' | 'warn' | 'error'>>({})
+
+  const handleWidgetStatus = useCallback((instanceId: string, status: 'ok' | 'warn' | 'error') => {
+    setWidgetStatuses(prev => ({ ...prev, [instanceId]: status }))
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -91,6 +96,13 @@ export default function App() {
   const activeTab = dashboard?.tabs.find(t => t.id === activeTabId) ?? null
   const satMap = Object.fromEntries((dashboard?.satellites ?? []).map(s => [s.id, s]))
 
+  const allInstances = dashboard?.tabs.flatMap(t => t.widgets) ?? []
+  const statusCounts = { ok: 0, warn: 0, error: 0 }
+  for (const inst of allInstances) {
+    const s = widgetStatuses[inst.instanceId] ?? 'ok'
+    statusCounts[s]++
+  }
+
   return (
     <div className={styles.root}>
       <NavBar hostname={appConfig?.hostname ?? '…'} />
@@ -101,6 +113,13 @@ export default function App() {
           </p>
           <div className={styles.heroRight}>
             <p className={styles.clock}>{clock}</p>
+            {!loading && allInstances.length > 0 && (
+              <div className={styles.ribbon}>
+                <span className={styles.ribbonItem}><StatusDot status="ok" />{statusCounts.ok}</span>
+                <span className={styles.ribbonItem}><StatusDot status="warn" />{statusCounts.warn}</span>
+                <span className={styles.ribbonItem}><StatusDot status="error" />{statusCounts.error}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -137,6 +156,7 @@ export default function App() {
                     instance={instance}
                     satelliteUrl={`/api/proxy/${instance.satelliteId}`}
                     publicUrl={sat?.url ?? ''}
+                    onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
                   />
                 )
               })}

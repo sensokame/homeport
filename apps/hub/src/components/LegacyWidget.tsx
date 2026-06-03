@@ -3,14 +3,20 @@ import { WidgetCard } from '@homeport/ui'
 import type { WidgetData, WidgetProps } from '@homeport/ui'
 import { resolveIcon } from '../utils/icons'
 
-export function LegacyWidget({ satelliteUrl, publicUrl, config }: WidgetProps) {
+export function LegacyWidget({ satelliteUrl, publicUrl, config, onStatusChange }: WidgetProps) {
   const [data, setData] = useState<WidgetData | null>(null)
 
   useEffect(() => {
     fetch(`${satelliteUrl}/widget`)
       .then(r => r.json())
-      .then(setData)
-      .catch(() => setData({ status: 'error', title: 'Error', summary: 'unreachable', metrics: [] }))
+      .then((d: WidgetData) => {
+        setData(d)
+        onStatusChange?.(d.status)
+      })
+      .catch(() => {
+        setData({ status: 'error', title: 'Error', summary: 'unreachable', metrics: [] })
+        onStatusChange?.('error')
+      })
   }, [satelliteUrl])
 
   if (!data) return null
