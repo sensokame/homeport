@@ -1,0 +1,11 @@
+export interface Book {
+  title: string
+  author: string
+  year: number | null
+  added_year: number
+  goodreads_url: string
+  cover_url: string
+  average_rating: string
+  user_rating: number
+  vault_url: string | null
+}

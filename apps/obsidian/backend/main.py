@@ -8,7 +8,9 @@ from urllib.parse import quote
 
 import httpx
 import frontmatter
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
 GOODREADS_USER_ID = os.getenv("GOODREADS_USER_ID", "")
@@ -16,6 +18,7 @@ GOODREADS_FEED = f"https://www.goodreads.com/review/list_rss/{GOODREADS_USER_ID}
 QUARTZ_URL = os.getenv("QUARTZ_URL", "http://quartz.station")
 
 BOOKS_PATH = VAULT_PATH / "life" / "Books"
+STATIC_DIR = Path(__file__).parent / "static"
 _YEAR_RE = re.compile(r"^\d{4}$")
 
 app = FastAPI()
@@ -102,11 +105,12 @@ def fetch_goodreads():
         return []
 
 
-def fetch_goodreads_detailed():
+def _fetch_shelf(shelf: str) -> list:
     if not GOODREADS_USER_ID:
         return []
+    url = f"https://www.goodreads.com/review/list_rss/{GOODREADS_USER_ID}?shelf={shelf}"
     try:
-        r = httpx.get(GOODREADS_FEED, timeout=5, follow_redirects=True)
+        r = httpx.get(url, timeout=8, follow_redirects=True)
         r.raise_for_status()
         root = ET.fromstring(r.text)
         books = []
@@ -116,6 +120,7 @@ def fetch_goodreads_detailed():
                 continue
             year_raw = item.findtext("book_published", "").strip()
             added_raw = item.findtext("user_date_added", "").strip()
+            rating_raw = item.findtext("user_rating", "0").strip()
             books.append({
                 "title": title,
                 "author": item.findtext("author_name", "").strip(),
@@ -124,11 +129,16 @@ def fetch_goodreads_detailed():
                 "goodreads_url": item.findtext("link", "").strip(),
                 "cover_url": item.findtext("book_image_url", "").strip(),
                 "average_rating": item.findtext("average_rating", "").strip(),
+                "user_rating": int(rating_raw) if rating_raw.isdigit() else 0,
                 "vault_url": _find_vault_note(title),
             })
         return books
     except Exception:
         return []
+
+
+def fetch_goodreads_detailed():
+    return _fetch_shelf("currently-reading")
 
 
 def scan_vault_activity():
@@ -220,6 +230,25 @@ def sync_reading_notes():
     return {"created": created, "skipped": skipped}
 
 
+@app.get("/api/books")
+def books(shelf: str = Query(default="currently-reading")):
+    return _fetch_shelf(shelf)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+if STATIC_DIR.exists():
+    assets_dir = STATIC_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return {"detail": "frontend not built"}

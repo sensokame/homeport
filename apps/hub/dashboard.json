@@ -5,7 +5,7 @@
     { "id": "inventory", "url": "http://inventory.station", "widgetUrl": "http://inventory:8080" },
     { "id": "vikunja",   "url": "http://vikunja.station",   "widgetUrl": "http://vikunja-sat:8080" },
     { "id": "wger",      "url": "http://wger.station",      "widgetUrl": "http://wger-sat:8080" },
-    { "id": "knowledge", "url": "http://quartz.station",    "widgetUrl": "http://knowledge:8080" },
+    { "id": "knowledge", "url": "http://knowledge.station",  "widgetUrl": "http://knowledge:8080" },
     { "id": "budget",    "url": "http://budget.station",    "widgetUrl": "http://actual-sat:8080" }
   ],
   "tabs": [
