@@ -17,7 +17,7 @@
         { "instanceId": "inventory-main", "widgetId": "inventory.overview", "satelliteId": "inventory", "config": { "icon": "package" } },
         { "instanceId": "vikunja-main",   "widgetId": "vikunja.task-overview", "satelliteId": "vikunja",   "config": { "icon": "check-square" } },
         { "instanceId": "wger-main",      "widgetId": "legacy.widget", "satelliteId": "wger",      "config": { "icon": "activity" } },
-        { "instanceId": "knowledge-main", "widgetId": "legacy.widget", "satelliteId": "knowledge", "config": { "icon": "book-open" } },
+        { "instanceId": "knowledge-main", "widgetId": "knowledge.reading", "satelliteId": "knowledge", "config": { "icon": "book-open" } },
         { "instanceId": "budget-main",    "widgetId": "legacy.widget", "satelliteId": "budget",    "config": { "icon": "dollar-sign" } }
       ]
     }

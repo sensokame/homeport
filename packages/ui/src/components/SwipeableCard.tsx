@@ -28,7 +28,7 @@ export function SwipeableCard({ home, pages = [] }: SwipeableCardProps) {
   }
 
   return (
-    <>
+    <div className={styles.root}>
       <div
         className={styles.trackClip}
         onTouchStart={onTouchStart}
@@ -83,6 +83,6 @@ export function SwipeableCard({ home, pages = [] }: SwipeableCardProps) {
           <div className={styles.navSide} />
         </div>
       )}
-    </>
+    </div>
   )
 }

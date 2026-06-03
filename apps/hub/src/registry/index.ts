@@ -3,6 +3,7 @@ import { LegacyWidget } from '../components/LegacyWidget'
 import { TaskOverviewWidget } from '../widgets/vikunja/TaskOverviewWidget'
 import { ProjectFocusWidget } from '../widgets/vikunja/ProjectFocusWidget'
 import { InventoryOverviewWidget } from '../widgets/inventory/InventoryOverviewWidget'
+import { ReadingWidget } from '../widgets/knowledge/ReadingWidget'
 
 export const registry: Record<string, WidgetManifest> = {
   'legacy.widget': {
@@ -14,6 +15,13 @@ export const registry: Record<string, WidgetManifest> = {
     },
     component: LegacyWidget,
     fullScreen: true,
+  },
+  'knowledge.reading': {
+    id: 'knowledge.reading',
+    name: 'Reading',
+    description: 'Currently reading books with per-book details and vault links',
+    configSchema: {},
+    component: ReadingWidget,
   },
   'inventory.overview': {
     id: 'inventory.overview',

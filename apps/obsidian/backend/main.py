@@ -1,7 +1,10 @@
 import os
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
+from email.utils import parsedate
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 import frontmatter
@@ -10,8 +13,75 @@ from fastapi import FastAPI
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
 GOODREADS_USER_ID = os.getenv("GOODREADS_USER_ID", "")
 GOODREADS_FEED = f"https://www.goodreads.com/review/list_rss/{GOODREADS_USER_ID}?shelf=currently-reading"
+QUARTZ_URL = os.getenv("QUARTZ_URL", "http://quartz.station")
+
+BOOKS_PATH = VAULT_PATH / "life" / "Books"
+_YEAR_RE = re.compile(r"^\d{4}$")
 
 app = FastAPI()
+
+
+def _slugify(name: str) -> str:
+    return name.lower().replace(" ", "-")
+
+
+def _clean_title(title: str) -> str:
+    """Use the portion before ':' as the short title (matches how notes are named)."""
+    return title.split(":")[0].strip() if ":" in title else title
+
+
+def _find_vault_note(title: str) -> str | None:
+    if not BOOKS_PATH.exists():
+        return None
+    candidates = {_slugify(title), _slugify(_clean_title(title))}
+    for year_dir in BOOKS_PATH.iterdir():
+        if not year_dir.is_dir() or not _YEAR_RE.match(year_dir.name):
+            continue
+        for md_file in year_dir.glob("*.md"):
+            if _slugify(md_file.stem) in candidates:
+                path = f"life/books/{year_dir.name}/{quote(_slugify(md_file.stem))}"
+                return f"{QUARTZ_URL}/{path}"
+    return None
+
+
+def _count_by_year() -> dict[str, int]:
+    if not BOOKS_PATH.exists():
+        return {}
+    counts: dict[str, int] = {}
+    for year_dir in sorted(BOOKS_PATH.iterdir()):
+        if year_dir.is_dir() and _YEAR_RE.match(year_dir.name):
+            n = sum(1 for f in year_dir.glob("*.md") if f.is_file())
+            if n:
+                counts[year_dir.name] = n
+    return counts
+
+
+def _parse_year(date_str: str) -> int:
+    t = parsedate(date_str)
+    return t[0] if t else datetime.now(timezone.utc).year
+
+
+def _note_content(book: dict) -> str:
+    lines = ["## summary"]
+    if book.get("goodreads_url"):
+        lines.append(f'[{book["title"]}]({book["goodreads_url"]})')
+    if book.get("author"):
+        lines.append(f'by {book["author"]}')
+    if book.get("year"):
+        lines.append(f'Published: {book["year"]}')
+    lines += [
+        "",
+        "## verdict",
+        "",
+        "## about the author",
+        book.get("author", ""),
+        "",
+        "## while reading",
+        "",
+        "## reading experience",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def fetch_goodreads():
@@ -27,6 +97,35 @@ def fetch_goodreads():
             author = item.findtext("author_name", "").strip()
             if title:
                 books.append({"title": title, "author": author})
+        return books
+    except Exception:
+        return []
+
+
+def fetch_goodreads_detailed():
+    if not GOODREADS_USER_ID:
+        return []
+    try:
+        r = httpx.get(GOODREADS_FEED, timeout=5, follow_redirects=True)
+        r.raise_for_status()
+        root = ET.fromstring(r.text)
+        books = []
+        for item in root.findall(".//item"):
+            title = item.findtext("title", "").strip()
+            if not title:
+                continue
+            year_raw = item.findtext("book_published", "").strip()
+            added_raw = item.findtext("user_date_added", "").strip()
+            books.append({
+                "title": title,
+                "author": item.findtext("author_name", "").strip(),
+                "year": int(year_raw) if year_raw.isdigit() else None,
+                "added_year": _parse_year(added_raw) if added_raw else datetime.now(timezone.utc).year,
+                "goodreads_url": item.findtext("link", "").strip(),
+                "cover_url": item.findtext("book_image_url", "").strip(),
+                "average_rating": item.findtext("average_rating", "").strip(),
+                "vault_url": _find_vault_note(title),
+            })
         return books
     except Exception:
         return []
@@ -63,7 +162,6 @@ def scan_vault_reading():
 
 @app.get("/widget")
 def widget():
-    # Goodreads is primary; fall back to Obsidian frontmatter
     books = fetch_goodreads() or scan_vault_reading()
     active_count = scan_vault_activity()
 
@@ -89,6 +187,37 @@ def widget():
             {"label": "Active notes (7d)", "value": active_count},
         ],
     }
+
+
+@app.get("/api/reading")
+def reading():
+    current = fetch_goodreads_detailed()
+    read_by_year = _count_by_year()
+    return {
+        "current": current,
+        "read_by_year": read_by_year,
+        "total_read": sum(read_by_year.values()),
+    }
+
+
+@app.post("/api/reading/sync")
+def sync_reading_notes():
+    books = fetch_goodreads_detailed()
+    created, skipped = [], []
+    for book in books:
+        if book["vault_url"]:
+            skipped.append(_clean_title(book["title"]))
+            continue
+        year_dir = BOOKS_PATH / str(book["added_year"])
+        year_dir.mkdir(parents=True, exist_ok=True)
+        filename = _clean_title(book["title"]) + ".md"
+        filepath = year_dir / filename
+        if not filepath.exists():
+            filepath.write_text(_note_content(book))
+            created.append(_clean_title(book["title"]))
+        else:
+            skipped.append(_clean_title(book["title"]))
+    return {"created": created, "skipped": skipped}
 
 
 @app.get("/health")
