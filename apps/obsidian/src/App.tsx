@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { NavBar } from '@homeport/ui'
 import Reading from './pages/Reading'
 import Library from './pages/Library'
+import Writing from './pages/Writing'
 import styles from './App.module.css'
 
-type Section = 'reading'
+type Section = 'reading' | 'writing'
 type Shelf = 'currently-reading' | 'read' | 'to-read'
 
 function parseHash(hash: string): { section: Section; shelf: Shelf } {
+  if (hash.startsWith('#/writing')) return { section: 'writing', shelf: 'currently-reading' }
   if (hash === '#/read') return { section: 'reading', shelf: 'read' }
   if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read' }
   return { section: 'reading', shelf: 'currently-reading' }
@@ -24,6 +26,7 @@ export default function App() {
 
   const sectionLinks = [
     { label: 'Reading', href: '#/', active: section === 'reading' },
+    { label: 'Writing', href: '#/writing', active: section === 'writing' },
   ]
 
   const shelfTabs: { label: string; href: string; value: Shelf }[] = [
@@ -35,29 +38,32 @@ export default function App() {
   return (
     <div className={styles.root}>
       <NavBar hostname="knowledge" links={sectionLinks} />
-      <div className={styles.shelfNav}>
-        {shelfTabs.map(t => (
+      {section === 'reading' && (
+        <div className={styles.shelfNav}>
+          {shelfTabs.map(t => (
+            <a
+              key={t.value}
+              href={t.href}
+              className={[styles.shelfTab, shelf === t.value ? styles.shelfTabActive : ''].filter(Boolean).join(' ')}
+            >
+              {t.label}
+            </a>
+          ))}
           <a
-            key={t.value}
-            href={t.href}
-            className={[styles.shelfTab, shelf === t.value ? styles.shelfTabActive : ''].filter(Boolean).join(' ')}
+            className={styles.quartzBtn}
+            href="http://quartz.station"
+            target="_blank"
+            rel="noopener"
           >
-            {t.label}
+            Open Quartz →
           </a>
-        ))}
-        <a
-          className={styles.quartzBtn}
-          href="http://quartz.station"
-          target="_blank"
-          rel="noopener"
-        >
-          Open Quartz →
-        </a>
-      </div>
+        </div>
+      )}
       <main className={styles.main}>
-        {shelf === 'currently-reading' && <Reading />}
-        {shelf === 'read' && <Library shelf="read" />}
-        {shelf === 'to-read' && <Library shelf="to-read" />}
+        {section === 'reading' && shelf === 'currently-reading' && <Reading />}
+        {section === 'reading' && shelf === 'read' && <Library shelf="read" />}
+        {section === 'reading' && shelf === 'to-read' && <Library shelf="to-read" />}
+        {section === 'writing' && <Writing />}
       </main>
     </div>
   )

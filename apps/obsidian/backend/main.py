@@ -19,6 +19,7 @@ GOODREADS_FEED = f"https://www.goodreads.com/review/list_rss/{GOODREADS_USER_ID}
 QUARTZ_URL = os.getenv("QUARTZ_URL", "http://quartz.station")
 
 BOOKS_PATH = VAULT_PATH / "life" / "Books"
+WRITING_PATH = VAULT_PATH / "Writing" / "Writing"
 STATIC_DIR = Path(__file__).parent / "static"
 _YEAR_RE = re.compile(r"^\d{4}$")
 
@@ -259,6 +260,105 @@ def books(shelf: str = Query(default="currently-reading")):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Writing ──────────────────────────────────────────────────────────────────
+
+def _writing_project_path(name: str) -> Path:
+    return WRITING_PATH / name
+
+
+def _list_md_stems(folder: Path) -> list[str]:
+    if not folder.exists():
+        return []
+    return sorted(f.stem for f in folder.glob("*.md") if f.is_file())
+
+
+def _recent_activity(path: Path, days: int = 7) -> int:
+    if not path.exists():
+        return 0
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    return sum(
+        1 for f in path.rglob("*.md")
+        if datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc) >= cutoff
+    )
+
+
+@app.get("/api/writing/projects")
+def list_projects():
+    if not WRITING_PATH.exists():
+        return []
+    return sorted(
+        d.name for d in WRITING_PATH.iterdir()
+        if d.is_dir() and not d.name.startswith("_") and not d.name.startswith(".")
+    )
+
+
+class ProjectRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/writing/projects")
+def create_project(body: ProjectRequest):
+    slug = _slugify(body.name)
+    base = WRITING_PATH / slug
+    for folder in ("characters", "locations", "events", "timelines", "book"):
+        (base / folder).mkdir(parents=True, exist_ok=True)
+    return {"name": slug}
+
+
+@app.get("/api/writing/projects/{name}")
+def get_project(name: str):
+    base = _writing_project_path(name)
+    if not base.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {
+        "name": name,
+        "characters": len(_list_md_stems(base / "characters")),
+        "locations": len(_list_md_stems(base / "locations")),
+        "events": len(_list_md_stems(base / "events")),
+        "chapters": len(_list_md_stems(base / "book")),
+        "recent_activity": _recent_activity(base),
+    }
+
+
+@app.get("/api/writing/projects/{name}/characters")
+def list_characters(name: str):
+    return _list_md_stems(_writing_project_path(name) / "characters")
+
+
+class CharacterRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/writing/projects/{name}/characters")
+def create_character(name: str, body: CharacterRequest):
+    folder = _writing_project_path(name) / "characters"
+    folder.mkdir(parents=True, exist_ok=True)
+    filepath = folder / f"{body.name}.md"
+    if not filepath.exists():
+        filepath.write_text(f"# {body.name}\n\n## Description\n\n## Backstory\n\n## Arc\n")
+    return {"name": body.name, "created": not filepath.exists()}
+
+
+@app.get("/api/writing/projects/{name}/chapters")
+def list_chapters(name: str):
+    return _list_md_stems(_writing_project_path(name) / "book")
+
+
+class ChapterRequest(BaseModel):
+    title: str
+
+
+@app.post("/api/writing/projects/{name}/chapters")
+def create_chapter(name: str, body: ChapterRequest):
+    folder = _writing_project_path(name) / "book"
+    folder.mkdir(parents=True, exist_ok=True)
+    filepath = folder / f"{body.title}.md"
+    if not filepath.exists():
+        filepath.write_text(f"# {body.title}\n\n")
+    return {"title": body.title, "created": not filepath.exists()}
 
 
 if STATIC_DIR.exists():

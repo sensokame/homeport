@@ -9,3 +9,12 @@ export interface Book {
   user_rating: number
   vault_url: string | null
 }
+
+export interface WritingProject {
+  name: string
+  characters: number
+  locations: number
+  events: number
+  chapters: number
+  recent_activity: number
+}
