@@ -1,16 +1,21 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import styles from './SwipeableCard.module.css'
 
 export interface SwipeableCardProps {
   home: ReactNode
   pages?: ReactNode[]
+  activePage?: number
 }
 
 const SWIPE_THRESHOLD = 50
 
-export function SwipeableCard({ home, pages = [] }: SwipeableCardProps) {
+export function SwipeableCard({ home, pages = [], activePage }: SwipeableCardProps) {
   const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    if (activePage !== undefined) setIndex(activePage)
+  }, [activePage])
   const touchStartX = useRef<number | null>(null)
   const panels = [home, ...pages]
   const total = panels.length
@@ -47,8 +52,8 @@ export function SwipeableCard({ home, pages = [] }: SwipeableCardProps) {
         <div className={styles.nav}>
           <div className={styles.navSide}>
             {index > 0 && (
-              <button className={styles.homeBtn} onClick={() => setIndex(0)} aria-label="Go to home">
-                ← home
+              <button className={styles.homeBtn} onClick={() => setIndex(0)} aria-label="Go to overview">
+                ← overview
               </button>
             )}
           </div>
@@ -67,7 +72,7 @@ export function SwipeableCard({ home, pages = [] }: SwipeableCardProps) {
                   key={i}
                   className={[styles.dot, i === index ? styles.dotActive : ''].filter(Boolean).join(' ')}
                   onClick={() => setIndex(i)}
-                  aria-label={i === 0 ? 'Home' : `Page ${i}`}
+                  aria-label={i === 0 ? 'Overview' : `Page ${i}`}
                 />
               ))}
             </div>

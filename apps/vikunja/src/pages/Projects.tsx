@@ -21,8 +21,17 @@ export default function Projects() {
       {projects.map(p => (
         <div key={p.id} className={styles.row}>
           <span className={styles.name}>{p.title}</span>
-          <span className={styles.count}>
-            {p.task_count} task{p.task_count !== 1 ? 's' : ''}
+          <span className={styles.right}>
+            <span className={styles.count}>
+              {p.version && <>{p.version} · </>}
+              {p.task_count} task{p.task_count !== 1 ? 's' : ''}
+            </span>
+            <a
+              className={styles.open}
+              href={`http://vikunja.station/projects/${p.id}`}
+              target="_blank"
+              rel="noreferrer"
+            >open →</a>
           </span>
         </div>
       ))}

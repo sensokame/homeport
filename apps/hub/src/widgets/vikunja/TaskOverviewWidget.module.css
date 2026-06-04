@@ -115,10 +115,77 @@
   margin-bottom: var(--space-1);
 }
 
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.projectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+.projectRow:hover .projectRowName { color: var(--color-link); }
+
+.projectRowName {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.projectRowVersion {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.projectRowCount {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.projectLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.projectVersion {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.projectRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .projectCount {
   font-size: var(--text-xs);
   color: var(--color-muted);
 }
+
+.projectOpen {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.projectOpen:hover { color: var(--color-link); }
 
 .taskList {
   display: flex;

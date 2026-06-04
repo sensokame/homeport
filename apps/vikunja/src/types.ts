@@ -15,4 +15,5 @@ export interface Project {
   title: string
   task_count: number
   blocked_count: number
+  version: string | null
 }

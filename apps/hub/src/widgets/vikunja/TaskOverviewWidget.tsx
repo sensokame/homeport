@@ -27,7 +27,12 @@ function TaskRow({ task }: { task: VTask }) {
   )
 }
 
-function HomePanel({ tasks }: { tasks: VTask[] }) {
+function HomePanel({ tasks, projects, tasksByProject, onNavigate }: {
+  tasks: VTask[]
+  projects: VProject[]
+  tasksByProject: Map<number, VTask[]>
+  onNavigate: (page: number) => void
+}) {
   const overdue = tasks.filter(t => t.is_overdue)
   const today = tasks.filter(t => t.is_today && !t.is_overdue)
   const blocked = tasks.filter(t => t.is_waiting)
@@ -40,7 +45,7 @@ function HomePanel({ tasks }: { tasks: VTask[] }) {
     blocked.length > 0 ? `${blocked.length} blocked` : null,
   ].filter(Boolean)
 
-  const LIMIT = 7
+  const LIMIT = 5
   const shown = urgent.slice(0, LIMIT)
   const remaining = urgent.length - shown.length
 
@@ -50,13 +55,14 @@ function HomePanel({ tasks }: { tasks: VTask[] }) {
     grouped.get(t.project_name)!.push(t)
   }
 
+  const activeProjects = projects.filter(p => (tasksByProject.get(p.id)?.length ?? 0) > 0)
+
   return (
     <div className={styles.panel}>
       <span className={styles.pageTitle}>Overview</span>
       <p className={styles.summary}>{parts.join(' · ')}</p>
-      {urgent.length === 0 ? (
-        <p className={styles.allClear}>Nothing urgent</p>
-      ) : (
+
+      {urgent.length > 0 && (
         <div className={styles.urgentList}>
           {Array.from(grouped.entries()).map(([project, pts]) => (
             <div key={project} className={styles.group}>
@@ -64,7 +70,23 @@ function HomePanel({ tasks }: { tasks: VTask[] }) {
               {pts.map(t => <TaskRow key={t.id} task={t} />)}
             </div>
           ))}
-          {remaining > 0 && <p className={styles.more}>+{remaining} more</p>}
+          {remaining > 0 && <p className={styles.more}>+{remaining} more urgent</p>}
+        </div>
+      )}
+
+      {activeProjects.length > 0 && (
+        <div className={styles.projectList}>
+          {activeProjects.map((p, i) => (
+            <button key={p.id} className={styles.projectRow} onClick={() => onNavigate(i + 1)}>
+              <div className={styles.projectLeft}>
+                <span className={styles.projectRowName}>{p.title}</span>
+                {p.version && <span className={styles.projectRowVersion}>{p.version}</span>}
+              </div>
+              <span className={styles.projectRowCount}>
+                {tasksByProject.get(p.id)?.length ?? 0} tasks
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -72,14 +94,27 @@ function HomePanel({ tasks }: { tasks: VTask[] }) {
 }
 
 function ProjectPanel({ project, tasks }: { project: VProject; tasks: VTask[] }) {
+  const taskMeta = [
+    `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`,
+    project.blocked_count > 0 ? `${project.blocked_count} blocked` : null,
+  ].filter(Boolean).join(' · ')
+
   return (
     <div className={styles.panel}>
       <div className={styles.projectMeta}>
-        <span className={styles.projectName}>{project.title}</span>
-        <span className={styles.projectCount}>
-          {tasks.length} task{tasks.length !== 1 ? 's' : ''}
-          {project.blocked_count > 0 ? ` · ${project.blocked_count} blocked` : ''}
-        </span>
+        <div className={styles.projectLeft}>
+          <span className={styles.projectName}>{project.title}</span>
+          {project.version && <span className={styles.projectVersion}>{project.version}</span>}
+        </div>
+        <div className={styles.projectRight}>
+          <span className={styles.projectCount}>{taskMeta}</span>
+          <a
+            className={styles.projectOpen}
+            href={`http://vikunja.station/projects/${project.id}`}
+            target="_blank"
+            rel="noreferrer"
+          >open →</a>
+        </div>
       </div>
       {tasks.length === 0 ? (
         <p className={styles.empty}>No open tasks</p>
@@ -96,6 +131,7 @@ export function TaskOverviewWidget({ satelliteUrl, onStatusChange }: WidgetProps
   const [tasks, setTasks] = useState<VTask[]>([])
   const [projects, setProjects] = useState<VProject[]>([])
   const [loading, setLoading] = useState(true)
+  const [activePage, setActivePage] = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -125,7 +161,8 @@ export function TaskOverviewWidget({ satelliteUrl, onStatusChange }: WidgetProps
 
   return (
     <SwipeableCard
-      home={<HomePanel tasks={tasks} />}
+      activePage={activePage}
+      home={<HomePanel tasks={tasks} projects={projects} tasksByProject={tasksByProject} onNavigate={setActivePage} />}
       pages={activeProjects.map(p => (
         <ProjectPanel key={p.id} project={p} tasks={tasksByProject.get(p.id) ?? []} />
       ))}

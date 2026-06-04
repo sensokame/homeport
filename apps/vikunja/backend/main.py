@@ -59,6 +59,14 @@ def fetch_projects():
     return [p for p in projects if not p.get("is_archived")]
 
 
+def _parse_version(description: str) -> str | None:
+    for line in description.splitlines():
+        if line.startswith("version:"):
+            v = line[len("version:"):].strip()
+            return v if v else None
+    return None
+
+
 def is_waiting(task: dict) -> bool:
     return any(
         lbl.get("title", "").lower() == "waiting"
@@ -150,6 +158,7 @@ def get_projects():
             "title": p["title"],
             "task_count": task_counts.get(p["id"], 0),
             "blocked_count": blocked_counts.get(p["id"], 0),
+            "version": _parse_version(p.get("description") or ""),
         }
         for p in projects
     ]
