@@ -11,6 +11,7 @@ import frontmatter
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
 GOODREADS_USER_ID = os.getenv("GOODREADS_USER_ID", "")
@@ -228,6 +229,26 @@ def sync_reading_notes():
         else:
             skipped.append(_clean_title(book["title"]))
     return {"created": created, "skipped": skipped}
+
+
+class NoteRequest(BaseModel):
+    title: str
+    author: str = ""
+    year: int | None = None
+    added_year: int | None = None
+    goodreads_url: str = ""
+
+
+@app.post("/api/notes/create")
+def create_note(body: NoteRequest):
+    year_dir = BOOKS_PATH / str(body.added_year or datetime.now(timezone.utc).year)
+    year_dir.mkdir(parents=True, exist_ok=True)
+    filename = _clean_title(body.title) + ".md"
+    filepath = year_dir / filename
+    if not filepath.exists():
+        filepath.write_text(_note_content(body.model_dump()))
+    vault_url = _find_vault_note(body.title)
+    return {"vault_url": vault_url}
 
 
 @app.get("/api/books")

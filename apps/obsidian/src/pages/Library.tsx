@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchBooks } from '../api'
+import { fetchBooks, createNote } from '../api'
 import type { Book } from '../types'
 import styles from './Books.module.css'
 
@@ -8,7 +8,23 @@ function Stars({ n }: { n: number }) {
   return <span className={styles.stars}>{'★'.repeat(n)}{'☆'.repeat(5 - n)}</span>
 }
 
-function BookRow({ book }: { book: Book }) {
+function BookRow({ book, onNoteCreated }: { book: Book; onNoteCreated: (title: string, url: string) => void }) {
+  const [creating, setCreating] = useState(false)
+  const [vaultUrl, setVaultUrl] = useState(book.vault_url)
+
+  async function handleCreate() {
+    setCreating(true)
+    try {
+      const result = await createNote(book)
+      if (result.vault_url) {
+        setVaultUrl(result.vault_url)
+        onNoteCreated(book.title, result.vault_url)
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <div className={styles.row}>
       {book.cover_url && (
@@ -21,8 +37,12 @@ function BookRow({ book }: { book: Book }) {
         </div>
         <span className={styles.author}>{book.author}{book.year ? ` · ${book.year}` : ''}</span>
         <div className={styles.actions}>
-          {book.vault_url && (
-            <a className={styles.link} href={book.vault_url} target="_blank" rel="noopener">Open in Obsidian →</a>
+          {vaultUrl ? (
+            <a className={styles.link} href={vaultUrl} target="_blank" rel="noopener">Open in Obsidian →</a>
+          ) : (
+            <button className={styles.createBtn} onClick={handleCreate} disabled={creating}>
+              {creating ? 'Creating…' : 'Create note'}
+            </button>
           )}
           {book.goodreads_url && (
             <a className={styles.linkMuted} href={book.goodreads_url} target="_blank" rel="noopener">Goodreads →</a>
@@ -45,6 +65,10 @@ export default function Library({ shelf }: Props) {
     fetchBooks(shelf).then(setBooks).finally(() => setLoading(false))
   }, [shelf])
 
+  function handleNoteCreated(title: string, url: string) {
+    setBooks(prev => prev.map(b => b.title === title ? { ...b, vault_url: url } : b))
+  }
+
   const heading = shelf === 'read' ? 'Read' : 'Want to read'
   const empty = shelf === 'read' ? 'No books on the read shelf.' : 'Nothing on the to-read shelf.'
 
@@ -53,9 +77,13 @@ export default function Library({ shelf }: Props) {
 
   return (
     <div>
-      <h1 className={styles.heading}>{heading} <span className={styles.count}>{books.length}</span></h1>
+      <h1 className={styles.heading}>
+        {heading} <span className={styles.count}>{books.length}</span>
+      </h1>
       <div className={styles.rowList}>
-        {books.map(b => <BookRow key={b.title} book={b} />)}
+        {books.map(b => (
+          <BookRow key={b.title} book={b} onNoteCreated={handleNoteCreated} />
+        ))}
       </div>
     </div>
   )

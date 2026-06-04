@@ -4,36 +4,60 @@ import Reading from './pages/Reading'
 import Library from './pages/Library'
 import styles from './App.module.css'
 
-type Page = 'reading' | 'read' | 'to-read'
+type Section = 'reading'
+type Shelf = 'currently-reading' | 'read' | 'to-read'
+
+function parseHash(hash: string): { section: Section; shelf: Shelf } {
+  if (hash === '#/read') return { section: 'reading', shelf: 'read' }
+  if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read' }
+  return { section: 'reading', shelf: 'currently-reading' }
+}
 
 export default function App() {
-  const [page, setPage] = useState<Page>('reading')
+  const [{ section, shelf }, setRoute] = useState(() => parseHash(window.location.hash))
 
   useEffect(() => {
-    const handler = () => {
-      const hash = window.location.hash
-      if (hash === '#/read') setPage('read')
-      else if (hash === '#/to-read') setPage('to-read')
-      else setPage('reading')
-    }
-    handler()
+    const handler = () => setRoute(parseHash(window.location.hash))
     window.addEventListener('hashchange', handler)
     return () => window.removeEventListener('hashchange', handler)
   }, [])
 
-  const links = [
-    { label: 'Reading', href: '#/', active: page === 'reading' },
-    { label: 'Read', href: '#/read', active: page === 'read' },
-    { label: 'To Read', href: '#/to-read', active: page === 'to-read' },
+  const sectionLinks = [
+    { label: 'Reading', href: '#/', active: section === 'reading' },
+  ]
+
+  const shelfTabs: { label: string; href: string; value: Shelf }[] = [
+    { label: 'Currently reading', href: '#/', value: 'currently-reading' },
+    { label: 'Read', href: '#/read', value: 'read' },
+    { label: 'To read', href: '#/to-read', value: 'to-read' },
   ]
 
   return (
     <div className={styles.root}>
-      <NavBar hostname="knowledge" links={links} />
+      <NavBar hostname="knowledge" links={sectionLinks} />
+      <div className={styles.shelfNav}>
+        {shelfTabs.map(t => (
+          <a
+            key={t.value}
+            href={t.href}
+            className={[styles.shelfTab, shelf === t.value ? styles.shelfTabActive : ''].filter(Boolean).join(' ')}
+          >
+            {t.label}
+          </a>
+        ))}
+        <a
+          className={styles.quartzBtn}
+          href="http://quartz.station"
+          target="_blank"
+          rel="noopener"
+        >
+          Open Quartz →
+        </a>
+      </div>
       <main className={styles.main}>
-        {page === 'reading' && <Reading />}
-        {page === 'read' && <Library shelf="read" />}
-        {page === 'to-read' && <Library shelf="to-read" />}
+        {shelf === 'currently-reading' && <Reading />}
+        {shelf === 'read' && <Library shelf="read" />}
+        {shelf === 'to-read' && <Library shelf="to-read" />}
       </main>
     </div>
   )
