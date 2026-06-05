@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        app: [hub, infra, inventory, obsidian, vikunja, wger, actual]
+        app: [hub, infra, inventory, obsidian, vikunja, wger, actual, gcal]
 
     steps:
       - name: Checkout

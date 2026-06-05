@@ -47,6 +47,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState(() => fmtTime(new Date()))
   const [widgetStatuses, setWidgetStatuses] = useState<Record<string, 'ok' | 'warn' | 'error'>>({})
+  const [focusedInstanceId, setFocusedInstanceId] = useState<string | null>(null)
 
   const handleWidgetStatus = useCallback((instanceId: string, status: 'ok' | 'warn' | 'error') => {
     setWidgetStatuses(prev => ({ ...prev, [instanceId]: status }))
@@ -103,10 +104,37 @@ export default function App() {
     statusCounts[s]++
   }
 
+  const focusedInstance = focusedInstanceId
+    ? (dashboard?.tabs.flatMap(t => t.widgets).find(w => w.instanceId === focusedInstanceId) ?? null)
+    : null
+
   return (
     <div className={styles.root}>
       <NavBar hostname={appConfig?.hostname ?? '…'} />
-      <div className={styles.hero}>
+      {focusedInstance && (() => {
+        const manifest = registry[focusedInstance.widgetId]
+        if (!manifest) return null
+        const sat = satMap[focusedInstance.satelliteId]
+        const Widget = manifest.component
+        return (
+          <div className={styles.focusedWrapper}>
+            <div className={styles.focusedHeader}>
+              <span className={styles.focusedLabel}>focus mode</span>
+              <button className={styles.exitFocusBtn} onClick={() => setFocusedInstanceId(null)}>← back</button>
+            </div>
+            <div className={styles.focusedContent}>
+              <Widget
+                config={focusedInstance.config}
+                satelliteUrl={`/api/proxy/${focusedInstance.satelliteId}`}
+                publicUrl={sat?.url ?? ''}
+                isFocused={true}
+                onStatusChange={() => {}}
+              />
+            </div>
+          </div>
+        )
+      })()}
+      <div className={styles.hero} style={focusedInstance ? { display: 'none' } : undefined}>
         <div className={styles.heroInner}>
           <p className={styles.heroSub}>
             home server{appConfig?.version ? ` · v${appConfig.version}` : ''}
@@ -123,7 +151,7 @@ export default function App() {
           </div>
         </div>
       </div>
-      {dashboard && dashboard.tabs.length > 0 && (
+      {!focusedInstance && dashboard && dashboard.tabs.length > 0 && (
         <TabBar
           tabs={dashboard.tabs}
           activeId={activeTabId ?? dashboard.tabs[0].id}
@@ -131,7 +159,7 @@ export default function App() {
           onSettingsOpen={() => setSettingsOpen(true)}
         />
       )}
-      <main className={styles.main}>
+      <main className={styles.main} style={focusedInstance ? { display: 'none' } : undefined}>
         {loading ? (
           <p className={styles.muted}>loading…</p>
         ) : !activeTab || activeTab.widgets.length === 0 ? (
@@ -157,6 +185,7 @@ export default function App() {
                     satelliteUrl={`/api/proxy/${instance.satelliteId}`}
                     publicUrl={sat?.url ?? ''}
                     onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
+                    onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
                   />
                 )
               })}

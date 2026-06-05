@@ -10,9 +10,10 @@ interface WidgetShellProps {
   satelliteUrl: string
   publicUrl: string
   onStatusChange?: (status: 'ok' | 'warn' | 'error') => void
+  onFocusRequest?: () => void
 }
 
-export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange }: WidgetShellProps) {
+export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange, onFocusRequest }: WidgetShellProps) {
   const [status, setStatus] = useState<'ok' | 'warn' | 'error'>('ok')
 
   const handleStatusChange = (s: 'ok' | 'warn' | 'error') => {
@@ -26,6 +27,7 @@ export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onSta
     satelliteUrl,
     publicUrl,
     onStatusChange: handleStatusChange,
+    onFocusRequest,
   }
 
   if (manifest.fullScreen) {

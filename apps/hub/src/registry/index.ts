@@ -7,6 +7,7 @@ import { ReadingWidget } from '../widgets/knowledge/ReadingWidget'
 import { InfraWidget } from '../widgets/infra/InfraWidget'
 import { FitnessWidget } from '../widgets/fitness/FitnessWidget'
 import { BudgetWidget } from '../widgets/budget/BudgetWidget'
+import { ConsciousTradeWidget } from '../widgets/calendar/ConsciousTradeWidget'
 
 export const registry: Record<string, WidgetManifest> = {
   'legacy.widget': {
@@ -69,5 +70,12 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Current month budget summary — spent vs remaining',
     configSchema: {},
     component: BudgetWidget,
+  },
+  'calendar.conscious-trade': {
+    id: 'calendar.conscious-trade',
+    name: 'Conscious Trade',
+    description: 'Current calendar block with one-click trade acknowledgment',
+    configSchema: {},
+    component: ConsciousTradeWidget,
   },
 }

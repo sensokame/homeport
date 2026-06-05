@@ -2,6 +2,11 @@
   "version": 2,
   "satellites": [
     {
+      "id": "gcal",
+      "url": "http://gcal.station",
+      "widgetUrl": "http://gcal-sat:8080"
+    },
+    {
       "id": "infra",
       "url": "http://infra.station",
       "widgetUrl": "http://infra:8080"
@@ -37,6 +42,12 @@
       "id": "overview",
       "label": "Overview",
       "widgets": [
+        {
+          "instanceId": "gcal-main",
+          "widgetId": "calendar.conscious-trade",
+          "satelliteId": "gcal",
+          "config": {}
+        },
         {
           "instanceId": "infra-main",
           "widgetId": "infra.overview",

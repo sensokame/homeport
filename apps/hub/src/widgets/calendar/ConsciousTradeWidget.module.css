@@ -1,0 +1,144 @@
+.panel {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.label {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.focusBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+
+.focusBtn:hover {
+  color: var(--color-link);
+}
+
+.eventTitle {
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.eventTitle[data-traded='true'] {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.eventTime {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tradeBtn {
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+  width: 100%;
+}
+
+.tradeBtn:hover {
+  border-color: var(--color-warn);
+  color: var(--color-warn);
+}
+
+.tradedBadge {
+  font-size: var(--text-sm);
+  color: var(--color-ok);
+}
+
+.muted {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/* ── Focused view ──────────────────────────── */
+
+.focusedPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+}
+
+.focusedBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 480px;
+  width: 100%;
+}
+
+.focusedMeta {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.focusedTitle {
+  font-size: clamp(24px, 5vw, 48px);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.focusedTime {
+  font-size: var(--text-lg);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-link);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.remaining {
+  font-size: var(--text-base);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}

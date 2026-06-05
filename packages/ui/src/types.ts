@@ -6,6 +6,10 @@ export interface WidgetProps {
   publicUrl: string     // public URL for "open →" links
   /** Called by the widget when its status is determined; shell uses this to colour the card border. */
   onStatusChange?: (status: 'ok' | 'warn' | 'error') => void
+  /** Called by the widget to request entering focus mode (hub takes over full-screen layout). */
+  onFocusRequest?: () => void
+  /** True when the hub has entered focus mode for this widget; widget should render its focused view. */
+  isFocused?: boolean
 }
 
 export type WidgetComponent = ComponentType<WidgetProps>
