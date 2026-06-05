@@ -3,13 +3,15 @@ import { NavBar } from '@homeport/ui'
 import Reading from './pages/Reading'
 import Library from './pages/Library'
 import Writing from './pages/Writing'
+import Life from './pages/Life'
 import styles from './App.module.css'
 
-type Section = 'reading' | 'writing'
+type Section = 'reading' | 'writing' | 'life'
 type Shelf = 'currently-reading' | 'read' | 'to-read'
 
 function parseHash(hash: string): { section: Section; shelf: Shelf } {
   if (hash.startsWith('#/writing')) return { section: 'writing', shelf: 'currently-reading' }
+  if (hash.startsWith('#/life')) return { section: 'life', shelf: 'currently-reading' }
   if (hash === '#/read') return { section: 'reading', shelf: 'read' }
   if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read' }
   return { section: 'reading', shelf: 'currently-reading' }
@@ -27,6 +29,7 @@ export default function App() {
   const sectionLinks = [
     { label: 'Reading', href: '#/', active: section === 'reading' },
     { label: 'Writing', href: '#/writing', active: section === 'writing' },
+    { label: 'Life', href: '#/life', active: section === 'life' },
   ]
 
   const shelfTabs: { label: string; href: string; value: Shelf }[] = [
@@ -59,11 +62,27 @@ export default function App() {
           </a>
         </div>
       )}
+      {section === 'life' && (
+        <div className={styles.shelfNav}>
+          <a href="#/life" className={[styles.shelfTab, styles.shelfTabActive].join(' ')}>
+            Overview
+          </a>
+          <a
+            className={styles.quartzBtn}
+            href="http://quartz.station"
+            target="_blank"
+            rel="noopener"
+          >
+            Open Quartz →
+          </a>
+        </div>
+      )}
       <main className={styles.main}>
         {section === 'reading' && shelf === 'currently-reading' && <Reading />}
         {section === 'reading' && shelf === 'read' && <Library shelf="read" />}
         {section === 'reading' && shelf === 'to-read' && <Library shelf="to-read" />}
         {section === 'writing' && <Writing />}
+        {section === 'life' && <Life />}
       </main>
     </div>
   )

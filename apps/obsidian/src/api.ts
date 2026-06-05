@@ -1,4 +1,4 @@
-import type { Book, WritingProject } from './types'
+import type { Book, WritingProject, JournalResponse, ActivityItem } from './types'
 
 export async function fetchBooks(shelf: string): Promise<Book[]> {
   const r = await fetch(`/api/books?shelf=${encodeURIComponent(shelf)}`)
@@ -68,4 +68,27 @@ export async function createChapter(project: string, title: string): Promise<voi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
   })
+}
+
+export async function fetchJournal(): Promise<JournalResponse> {
+  const r = await fetch('/api/journal/today')
+  return r.json()
+}
+
+export async function createJournal(): Promise<JournalResponse> {
+  const r = await fetch('/api/journal/today', { method: 'POST' })
+  return r.json()
+}
+
+export async function saveJournal(content: string): Promise<void> {
+  await fetch('/api/journal/today', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+}
+
+export async function fetchActivity(): Promise<ActivityItem[]> {
+  const r = await fetch('/api/activity')
+  return r.json()
 }

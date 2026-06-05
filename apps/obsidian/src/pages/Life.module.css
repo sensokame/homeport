@@ -1,0 +1,223 @@
+.journalSection {
+  margin-bottom: var(--space-10);
+}
+
+.journalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.journalDate {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.previewToggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.toggleBtn {
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggleActive {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.startBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-link);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.startBtn:hover {
+  border-color: var(--color-link);
+}
+
+.journalEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 280px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  font-family: monospace;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  resize: vertical;
+  box-sizing: border-box;
+  line-height: 1.6;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-muted);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.savedMsg {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.saveBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-link);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.saveBtn:hover:not(:disabled) {
+  border-color: var(--color-link);
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.preview {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  min-height: 280px;
+  line-height: 1.6;
+}
+
+.preview h1,
+.preview h2,
+.preview h3 {
+  font-weight: 600;
+  margin: var(--space-4) 0 var(--space-2) 0;
+  color: var(--color-text);
+}
+
+.preview h2 {
+  font-size: var(--text-base);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-1);
+}
+
+.preview p {
+  margin: var(--space-2) 0;
+}
+
+.preview ul,
+.preview ol {
+  padding-left: var(--space-5);
+  margin: var(--space-2) 0;
+}
+
+.preview code {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+
+/* ── Activity ── */
+
+.activityList {
+  display: flex;
+  flex-direction: column;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-4);
+}
+
+.activityItem:last-child {
+  border-bottom: none;
+}
+
+.activityName {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.vaultBadge {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-2);
+  text-transform: lowercase;
+}
+
+.activityTime {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  min-width: 60px;
+  text-align: right;
+}
+
+.muted {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-4) 0;
+}

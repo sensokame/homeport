@@ -18,3 +18,14 @@ export interface WritingProject {
   chapters: number
   recent_activity: number
 }
+
+export interface JournalResponse {
+  exists: boolean
+  content: string
+}
+
+export interface ActivityItem {
+  name: string
+  vault: string
+  modified: string
+}

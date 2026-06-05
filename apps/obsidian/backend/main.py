@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from email.utils import parsedate
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import httpx
 import frontmatter
@@ -359,6 +360,89 @@ def create_chapter(name: str, body: ChapterRequest):
     if not filepath.exists():
         filepath.write_text(f"# {body.title}\n\n")
     return {"title": body.title, "created": not filepath.exists()}
+
+
+# ── Journal ──────────────────────────────────────────────────────────────────
+
+JOURNAL_PATH = VAULT_PATH / "life" / "Journal"
+_TZ = ZoneInfo("Europe/Berlin")
+
+_JOURNAL_TEMPLATE = """\
+## what's happening
+In case of random urgent thoughts. Write here
+## what happened
+Write down what you went through
+## what we learned
+What we learned from this day
+
+## what we want to do
+Ideas for the future"""
+
+
+def _today_journal_path() -> Path:
+    now = datetime.now(tz=_TZ)
+    day_name = now.strftime("%A")
+    filename = now.strftime(f"%Y-%m-%d-{day_name}.md")
+    return JOURNAL_PATH / now.strftime("%Y") / now.strftime("%m") / filename
+
+
+@app.get("/api/journal/today")
+def get_today_journal():
+    path = _today_journal_path()
+    if path.exists():
+        return {"exists": True, "content": path.read_text()}
+    return {"exists": False, "content": ""}
+
+
+@app.post("/api/journal/today")
+def create_today_journal():
+    path = _today_journal_path()
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_JOURNAL_TEMPLATE)
+    return {"exists": True, "content": path.read_text()}
+
+
+class JournalUpdate(BaseModel):
+    content: str
+
+
+@app.put("/api/journal/today")
+def save_today_journal(body: JournalUpdate):
+    path = _today_journal_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body.content)
+    return {"exists": True, "content": body.content}
+
+
+# ── Activity ──────────────────────────────────────────────────────────────────
+
+_SKIP_PARTS = {".obsidian", ".trash", "Templates", ".git"}
+
+
+@app.get("/api/activity")
+def vault_activity():
+    now = datetime.now(tz=timezone.utc)
+    week_ago = now - timedelta(days=7)
+    results = []
+    for md_file in VAULT_PATH.rglob("*.md"):
+        if any(p in _SKIP_PARTS or p.startswith(".") for p in md_file.parts):
+            continue
+        try:
+            mtime = datetime.fromtimestamp(md_file.stat().st_mtime, tz=timezone.utc)
+            if mtime < week_ago:
+                continue
+            rel = md_file.relative_to(VAULT_PATH)
+            vault = rel.parts[0] if len(rel.parts) > 1 else "root"
+            results.append({
+                "name": md_file.stem,
+                "vault": vault,
+                "modified": mtime.isoformat(),
+            })
+        except Exception:
+            continue
+    results.sort(key=lambda x: x["modified"], reverse=True)
+    return results[:30]
 
 
 if STATIC_DIR.exists():
