@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 WGER_URL = os.getenv("WGER_URL", "http://wger/api/v2")
 WGER_TOKEN = os.getenv("WGER_TOKEN", "")
@@ -28,6 +29,23 @@ def wger_get(path: str, params: dict = None):
         raise HTTPException(status_code=502, detail=str(e))
 
 
+def wger_post(path: str, body: dict):
+    try:
+        r = httpx.post(
+            f"{WGER_URL}{path}",
+            headers={**headers(), "Content-Type": "application/json"},
+            json=body,
+            timeout=5,
+        )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        return r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 def today_str():
     return date.today().isoformat()
 
@@ -46,8 +64,7 @@ def fetch_routines():
 
 
 def fetch_scheduled_today():
-    """Check if today's weekday has a scheduled training day in any routine."""
-    today_weekday = date.today().weekday()  # 0=Monday
+    today_weekday = date.today().weekday()
     try:
         days = wger_get("/day/", {"format": "json", "limit": 100}).get("results", [])
         return any(today_weekday in d.get("day", []) for d in days)
@@ -60,6 +77,8 @@ def fetch_nutrition_today():
     today = today_str()
     return [e for e in data.get("results", []) if e.get("datetime", "").startswith(today)]
 
+
+# ── read endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/widget")
 def widget():
@@ -149,6 +168,148 @@ def get_nutrition():
     diary = fetch_nutrition_today()
     return {"plans": plans, "diary_today": diary}
 
+
+@app.get("/api/exercises")
+def search_exercises(q: str):
+    results = wger_get("/exercise/search/", {"term": q, "language": "english", "format": "json"})
+    suggestions = results.get("suggestions", [])
+    return [{"id": s["data"]["base_id"], "name": s["value"]} for s in suggestions]
+
+
+@app.get("/api/today-exercises")
+def get_today_exercises():
+    today_weekday = date.today().weekday()
+    days_data = wger_get("/day/", {"format": "json", "limit": 100}).get("results", [])
+    today_days = [d for d in days_data if today_weekday in d.get("day", [])]
+
+    if not today_days:
+        return {"scheduled": False, "exercises": [], "logs": []}
+
+    seen: set[int] = set()
+    exercise_ids: list[int] = []
+    for day in today_days:
+        slots = wger_get("/slot/", {"format": "json", "day": day["id"], "limit": 100}).get("results", [])
+        for slot in slots:
+            entries = wger_get("/slot-entry/", {"format": "json", "slot": slot["id"], "limit": 100}).get("results", [])
+            for e in entries:
+                eid = e["exercise"]
+                if eid not in seen:
+                    seen.add(eid)
+                    exercise_ids.append(eid)
+
+    exercises = []
+    for eid in exercise_ids:
+        try:
+            info = wger_get(f"/exerciseinfo/{eid}/")
+            translations = info.get("translations", [])
+            name = next((t["name"] for t in translations if t.get("language") == 2), None)
+            if not name and translations:
+                name = translations[0].get("name")
+            exercises.append({"id": eid, "name": name or f"Exercise {eid}"})
+        except Exception:
+            exercises.append({"id": eid, "name": f"Exercise {eid}"})
+
+    logs_data = wger_get("/workoutlog/", {"format": "json", "limit": 100})
+    today = today_str()
+    logs = [l for l in logs_data.get("results", []) if l.get("date", "").startswith(today)]
+    set_counts: dict[int, int] = {}
+    for l in logs:
+        eid = l["exercise"]
+        set_counts[eid] = set_counts.get(eid, 0) + 1
+
+    return {
+        "scheduled": True,
+        "exercises": [
+            {"id": ex["id"], "name": ex["name"], "logged": ex["id"] in set_counts, "set_count": set_counts.get(ex["id"], 0)}
+            for ex in exercises
+        ],
+        "logs": logs,
+    }
+
+
+@app.get("/api/ingredients")
+def search_ingredients(q: str):
+    results = wger_get("/ingredient/", {"format": "json", "name": q, "limit": 20})
+    return [{"id": i["id"], "name": i["name"]} for i in results.get("results", [])]
+
+
+# ── write endpoints ───────────────────────────────────────────────────────────
+
+class SessionCreate(BaseModel):
+    workout_id: int | None = None
+    notes: str = ""
+
+
+@app.post("/api/session")
+def create_session(body: SessionCreate):
+    existing = fetch_today_session()
+    if existing:
+        return {"created": False, "session": existing}
+
+    workout_id = body.workout_id
+    if not workout_id:
+        routines = fetch_routines()
+        if not routines:
+            raise HTTPException(status_code=400, detail="No routines found in wger")
+        workout_id = routines[0]["id"]
+
+    session = wger_post("/workoutsession/", {
+        "workout": workout_id,
+        "date": today_str(),
+        "notes": body.notes,
+        "impression": "3",
+    })
+    return {"created": True, "session": session}
+
+
+class LogEntry(BaseModel):
+    exercise_id: int
+    workout_id: int  # routine ID (session.workout)
+    repetitions: int
+    weight: float
+    weight_unit: int = 1  # 1=kg, 2=lbs
+    rir: int | None = None
+    date: str | None = None  # YYYY-MM-DD, defaults to today
+
+
+@app.post("/api/log")
+def log_set(body: LogEntry):
+    payload = {
+        "exercise": body.exercise_id,
+        "workout": body.workout_id,
+        "repetitions": body.repetitions,
+        "weight": str(body.weight),
+        "weight_unit": body.weight_unit,
+        "date": body.date or today_str(),
+    }
+    if body.rir is not None:
+        payload["rir"] = body.rir
+    return wger_post("/workoutlog/", payload)
+
+
+class NutritionDiaryEntry(BaseModel):
+    plan_id: int
+    ingredient_id: int
+    amount: float
+    weight_unit: str | None = None
+    logged_at: str | None = None  # ISO datetime, defaults to now
+
+
+@app.post("/api/nutrition-diary")
+def log_nutrition_diary(body: NutritionDiaryEntry):
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    payload = {
+        "plan": body.plan_id,
+        "ingredient": body.ingredient_id,
+        "amount": str(body.amount),
+        "datetime": body.logged_at or now,
+    }
+    if body.weight_unit:
+        payload["weight_unit"] = body.weight_unit
+    return wger_post("/nutritiondiary/", payload)
+
+
+# ── health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
