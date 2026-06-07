@@ -21,10 +21,12 @@ export function SwipeableCard({ home, pages = [], activePage }: SwipeableCardPro
   const total = panels.length
 
   function onTouchStart(e: React.TouchEvent) {
+    e.stopPropagation()
     touchStartX.current = e.touches[0].clientX
   }
 
   function onTouchEnd(e: React.TouchEvent) {
+    e.stopPropagation()
     if (touchStartX.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
     touchStartX.current = null
@@ -33,7 +35,7 @@ export function SwipeableCard({ home, pages = [], activePage }: SwipeableCardPro
   }
 
   return (
-    <div className={styles.root} data-swipeable="true">
+    <div className={styles.root}>
       <div
         className={styles.trackClip}
         onTouchStart={onTouchStart}
