@@ -20,25 +20,49 @@ docker_client = docker.from_env()
 _update_lock = threading.Lock()
 _update_state: dict = {"running": False, "done": False, "results": []}
 
-# Background CPU sampler — psutil.cpu_percent() measures delta since the last
-# call in the same process, so calling it from two endpoints races to 0%.
-# A single sampler thread avoids that by owning all cpu_percent() calls.
+# Background sampler — owns all psutil.cpu_percent() calls (delta-based, races
+# to 0% if called from multiple endpoints) and the Docker container list
+# (containers.list() is expensive; no need to hit the daemon every 2s).
 _cpu_percent: float = 0.0
+_containers_cache: list = []
+_containers_cache_lock = threading.Lock()
 
-def _cpu_sampler():
-    global _cpu_percent
-    psutil.cpu_percent()  # warmup — first call always returns 0.0
+def _background_sampler():
+    global _cpu_percent, _containers_cache
+    psutil.cpu_percent()  # warmup
+    try:
+        with _containers_cache_lock:
+            _containers_cache = docker_client.containers.list(all=True)
+    except Exception:
+        pass
+    tick = 0
     while True:
         time.sleep(1)
         _cpu_percent = psutil.cpu_percent()
+        tick += 1
+        if tick % 10 == 0:  # refresh container list every 10s
+            try:
+                fresh = docker_client.containers.list(all=True)
+                with _containers_cache_lock:
+                    _containers_cache = fresh
+            except Exception:
+                pass
 
-threading.Thread(target=_cpu_sampler, daemon=True).start()
+threading.Thread(target=_background_sampler, daemon=True).start()
+
+
+def _cached_containers(all: bool = True) -> list:
+    with _containers_cache_lock:
+        containers = list(_containers_cache)
+    if not all:
+        return [c for c in containers if c.status == "running"]
+    return containers
 
 
 def _run_update():
     results = []
     try:
-        containers = [c for c in docker_client.containers.list() if c.name != OWN_NAME]
+        containers = [c for c in _cached_containers(all=False) if c.name != OWN_NAME]
         for c in containers:
             try:
                 tag = c.image.tags[0] if c.image.tags else None
@@ -109,15 +133,13 @@ def catalog():
 
 @app.get("/widget")
 def widget():
-    all_containers = docker_client.containers.list(all=True)
+    all_containers = _cached_containers()
     total = len(all_containers)
     running = sum(1 for c in all_containers if c.status == "running")
     stopped = total - running
 
     if total == 0 or running == total:
         status = "ok"
-    elif stopped / total > 0.2:
-        status = "error"
     else:
         status = "warn"
 
@@ -125,12 +147,15 @@ def widget():
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
 
+    if cpu > 80 or disk.percent > 80:
+        status = "warn"
+
     return {
         "title": "Infrastructure",
         "status": status,
         "summary": f"{running} / {total} containers running",
         "metrics": [
-            {"label": "CPU",  "value": f"{cpu}%", "alert": cpu > 80},
+            {"label": "CPU",  "value": f"{round(cpu, 1)}%", "alert": cpu > 80},
             {"label": "RAM",  "value": f"{mem.used / 1e9:.1f} GB / {mem.total / 1e9:.1f} GB"},
             {"label": "Disk", "value": f"{disk.percent}%", "alert": disk.percent > 80},
         ],
@@ -151,7 +176,7 @@ def get_config():
 
 @app.get("/api/containers")
 def list_containers():
-    return [_container_info(c) for c in docker_client.containers.list(all=True)]
+    return [_container_info(c) for c in _cached_containers()]
 
 
 @app.get("/api/containers/{name}")
@@ -183,7 +208,7 @@ def get_container_stats(name: str):
 
 @app.get("/api/stats")
 def get_all_stats():
-    running = [c for c in docker_client.containers.list() if c.status == "running"]
+    running = _cached_containers(all=False)
     results: dict = {}
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(_compute_stats, c): c.name for c in running}
@@ -234,7 +259,7 @@ def group_action(group: str, action: str):
     if action not in ("restart", "stop", "start", "redeploy"):
         raise HTTPException(status_code=400, detail="invalid action")
     containers = [
-        c for c in docker_client.containers.list(all=True)
+        c for c in _cached_containers()
         if c.labels.get("homeport.group") == group
     ]
     if not containers:
@@ -281,7 +306,7 @@ def system_stats():
 
 @app.post("/api/actions/restart-all")
 def restart_all():
-    containers = [c for c in docker_client.containers.list() if c.name != OWN_NAME]
+    containers = [c for c in _cached_containers(all=False) if c.name != OWN_NAME]
     for c in containers:
         c.restart()
     return {"ok": True, "count": len(containers)}
