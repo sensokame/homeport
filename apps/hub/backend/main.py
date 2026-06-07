@@ -88,10 +88,13 @@ async def remote_asset(satellite_id: str, path: str, request: Request):
             k: v for k, v in request.headers.items()
             if k.lower() not in ("host", "content-length")
         })
+    headers = dict(upstream.headers)
+    if path.endswith("remoteEntry.js"):
+        headers["Cache-Control"] = "no-store"
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
-        headers=dict(upstream.headers),
+        headers=headers,
     )
 
 
