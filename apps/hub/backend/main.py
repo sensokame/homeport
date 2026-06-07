@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 DASHBOARD_PATH = Path(os.getenv("DASHBOARD_PATH", "/app/dashboard.json"))
 STATIC_DIR = Path(__file__).parent / "static"
-VERSION = "0.9.0"
+VERSION = "1.0.0"
 
 app = FastAPI()
 
@@ -126,6 +126,9 @@ if STATIC_DIR.exists():
 
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
+    static_file = STATIC_DIR / full_path
+    if static_file.exists() and static_file.is_file():
+        return FileResponse(static_file)
     index = STATIC_DIR / "index.html"
     if index.exists():
         return FileResponse(index)
