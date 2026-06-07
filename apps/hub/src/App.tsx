@@ -91,12 +91,14 @@ export default function App() {
   useEffect(() => {
     if (focusedInstanceId || !dashboard || dashboard.tabs.length < 2) return
     const ids = dashboard.tabs.map(t => t.id)
-    let startX = 0, startY = 0
+    let startX = 0, startY = 0, startedInsideSwipeable = false
     function onTouchStart(e: TouchEvent) {
       startX = e.touches[0].clientX
       startY = e.touches[0].clientY
+      startedInsideSwipeable = !!(e.target as Element)?.closest?.('[data-swipeable]')
     }
     function onTouchEnd(e: TouchEvent) {
+      if (startedInsideSwipeable) return
       const dx = e.changedTouches[0].clientX - startX
       const dy = e.changedTouches[0].clientY - startY
       if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return

@@ -33,7 +33,7 @@ export function SwipeableCard({ home, pages = [], activePage }: SwipeableCardPro
   }
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-swipeable="true">
       <div
         className={styles.trackClip}
         onTouchStart={onTouchStart}
