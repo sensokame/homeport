@@ -1,12 +1,12 @@
 # Hub
 
-The hub is the entry point to homeport. It reads `dashboard.json`, proxies satellite API calls, and renders a configurable tab dashboard.
+The hub is the entry point to homeport. It reads `dashboard.json`, proxies satellite API calls, loads widget components via module federation, and renders a configurable tab dashboard.
 
 ---
 
 ## dashboard.json
 
-Mount this file into the container. Edit it without rebuilding. Changes to tabs and widget instances can also be made via the settings drawer in the UI (saved back to the file automatically).
+Mount this file into the container. Edit it without rebuilding. Changes to tabs and widget instances can also be made via the settings drawer in the UI (⚙ button in the tab bar) — they are saved back to the file automatically.
 
 ```json
 {
@@ -20,8 +20,9 @@ Mount this file into the container. Edit it without rebuilding. Changes to tabs 
       "id": "overview",
       "label": "Overview",
       "widgets": [
-        { "instanceId": "infra-main",   "widgetId": "legacy.widget", "satelliteId": "infra",   "config": { "icon": "server" } },
-        { "instanceId": "vikunja-main", "widgetId": "legacy.widget", "satelliteId": "vikunja", "config": { "icon": "check-square" } }
+        { "instanceId": "infra-main",   "widgetId": "infra.overview",         "satelliteId": "infra",   "config": {} },
+        { "instanceId": "vikunja-main", "widgetId": "vikunja.task-overview",  "satelliteId": "vikunja", "config": {} },
+        { "instanceId": "rc-focus",     "widgetId": "vikunja.project-focus",  "satelliteId": "vikunja", "config": { "project_id": 6 } }
       ]
     }
   ]
@@ -33,10 +34,10 @@ Mount this file into the container. Edit it without rebuilding. Changes to tabs 
 | Field | Required | Description |
 |---|---|---|
 | `id` | yes | Unique identifier, referenced by widget instances |
-| `url` | yes | Public URL used for "open →" links in widget cards |
+| `url` | yes | Public URL used for "open →" links in widget shells |
 | `widgetUrl` | yes | Internal Docker URL the hub backend proxies to |
 
-`widgetUrl` should use the internal Docker hostname (e.g. `http://infra:8080`) so traffic stays on the Docker network.
+`widgetUrl` should use the internal Docker hostname (e.g. `http://infra:8080`) so traffic stays on the Docker network. It is stripped before sending config to the browser.
 
 ### tabs
 
@@ -52,18 +53,18 @@ Mount this file into the container. Edit it without rebuilding. Changes to tabs 
 |---|---|---|
 | `instanceId` | yes | Unique per-instance ID — allows multiple instances of the same widget |
 | `widgetId` | yes | References a registered widget in the hub's widget registry |
-| `satelliteId` | yes | References a satellite entry in the `satellites` array |
+| `satelliteId` | no | References a satellite entry above (omit for builtin widgets) |
 | `config` | yes | Passed as `config` prop to the widget component |
 
-Multiple instances of the same `widgetId` are allowed — each with different `config` and `satelliteId`.
+See [Widget System](../widgets/index.md) for the available widget IDs and their config schemas.
 
 ---
 
 ## Widget registry
 
-The hub ships with a built-in `legacy.widget` that calls `GET /widget` on the satellite and renders the standard card layout. This covers all current first-party satellites.
+The hub ships a built-in widget registry. See [Built-in widget IDs](../widgets/index.md#built-in-widget-ids) for the full list.
 
-As the widget system matures, additional widget IDs will be added to the registry. See [Widget System](../widgets/index.md) for the full widget architecture.
+To add widgets from a new satellite, see [Building a Satellite](building-a-satellite.md).
 
 ---
 
@@ -81,11 +82,13 @@ As the widget system matures, additional widget IDs will be added to the registr
 | Endpoint | Description |
 |---|---|
 | `GET /api/config` | Returns `{ hostname, version }` |
-| `GET /api/dashboard` | Returns dashboard config (internal `widgetUrl` stripped) |
-| `PUT /api/dashboard` | Saves updated dashboard config (merges back internal `widgetUrl` values) |
+| `GET /api/dashboard` | Returns dashboard config (`widgetUrl` stripped) |
+| `PUT /api/dashboard` | Saves updated dashboard config (merges back `widgetUrl` values) |
+| `GET /api/catalog` | Aggregates `GET /api/catalog` from all registered satellites |
 | `GET /api/proxy/{satelliteId}/{path}` | Proxies requests to the satellite's internal `widgetUrl` |
+| `GET /api/remote/{satelliteId}/{path}` | Serves satellite assets (including `remoteEntry.js`) for module federation |
 
-Widget components in the browser call `GET /api/proxy/{satelliteId}/widget` (or any other path). The hub backend forwards the request to the satellite's internal Docker URL.
+Widget components in the browser call `GET /api/proxy/{satelliteId}/api/...`. The hub backend forwards the request to the satellite's internal Docker URL.
 
 ---
 

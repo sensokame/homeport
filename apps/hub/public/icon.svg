@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="28" fill="#0d1117"/>
+  <!-- house outline -->
+  <path d="M96 38 L160 90 L148 90 L148 154 L44 154 L44 90 L32 90 Z" fill="none" stroke="#c9d1d9" stroke-width="8" stroke-linejoin="round"/>
+  <!-- door -->
+  <rect x="80" y="118" width="32" height="36" rx="4" fill="none" stroke="#c9d1d9" stroke-width="6"/>
+  <!-- chimney -->
+  <rect x="118" y="50" width="14" height="28" rx="2" fill="#c9d1d9"/>
+</svg>

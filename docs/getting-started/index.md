@@ -12,7 +12,7 @@
 
 ## Pull images from GHCR
 
-Images are published on every release. Use them instead of building locally:
+Images are published on every release:
 
 ```bash
 docker pull ghcr.io/sensokame/homeport-hub:latest
@@ -22,6 +22,7 @@ docker pull ghcr.io/sensokame/homeport-obsidian:latest
 docker pull ghcr.io/sensokame/homeport-vikunja:latest
 docker pull ghcr.io/sensokame/homeport-wger:latest
 docker pull ghcr.io/sensokame/homeport-actual:latest
+docker pull ghcr.io/sensokame/homeport-gcal:latest
 ```
 
 To build from source instead, see [Contributing](../contributing/index.md).
@@ -30,7 +31,7 @@ To build from source instead, see [Contributing](../contributing/index.md).
 
 ## Deploy the hub
 
-Create a `dashboard.json` file (see [Hub](../satellites/hub.md) for the full format), then save the following as `docker-compose.yml` and bring it up:
+Create a `dashboard.json` file, then bring up the hub:
 
 ```json
 {
@@ -65,7 +66,7 @@ networks:
 docker compose up -d
 ```
 
-The hub serves on port 8080. Point your reverse proxy at it.
+The hub serves on port 8080. Point your reverse proxy at it. Open the settings drawer (⚙ button in the tab bar) to add widgets — or edit `dashboard.json` directly.
 
 ---
 
@@ -75,14 +76,13 @@ Each satellite is independent — deploy only what you need. For each one:
 
 1. Save the snippet below as `docker-compose.yml` in its own folder
 2. Run `docker compose up -d`
-3. Add the satellite to `dashboard.json`
+3. Add the satellite and a widget instance to `dashboard.json`
 
 ---
 
 ### Infrastructure
 
 ```yaml
-# docker-compose.yml
 services:
   infra:
     image: ghcr.io/sensokame/homeport-infra:latest
@@ -98,10 +98,6 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
@@ -109,7 +105,7 @@ Add to `dashboard.json`:
 { "id": "infra", "url": "http://infra.station", "widgetUrl": "http://infra:8080" }
 
 // widgets array in a tab
-{ "instanceId": "infra-main", "widgetId": "legacy.widget", "satelliteId": "infra", "config": { "icon": "server" } }
+{ "instanceId": "infra-main", "widgetId": "infra.overview", "satelliteId": "infra", "config": {} }
 ```
 
 ---
@@ -117,7 +113,6 @@ Add to `dashboard.json`:
 ### Inventory
 
 ```yaml
-# docker-compose.yml
 services:
   inventory:
     image: ghcr.io/sensokame/homeport-inventory:latest
@@ -133,10 +128,6 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
@@ -144,7 +135,7 @@ Add to `dashboard.json`:
 { "id": "inventory", "url": "http://inventory.station", "widgetUrl": "http://inventory:8080" }
 
 // widgets array in a tab
-{ "instanceId": "inventory-main", "widgetId": "legacy.widget", "satelliteId": "inventory", "config": { "icon": "package" } }
+{ "instanceId": "inventory-main", "widgetId": "inventory.overview", "satelliteId": "inventory", "config": {} }
 ```
 
 ---
@@ -154,7 +145,6 @@ Add to `dashboard.json`:
 Requires an Obsidian vault on the host.
 
 ```yaml
-# docker-compose.yml
 services:
   knowledge:
     image: ghcr.io/sensokame/homeport-obsidian:latest
@@ -172,28 +162,23 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
 // satellites array
-{ "id": "knowledge", "url": "http://quartz.station", "widgetUrl": "http://knowledge:8080" }
+{ "id": "knowledge", "url": "http://knowledge.station", "widgetUrl": "http://knowledge:8080" }
 
 // widgets array in a tab
-{ "instanceId": "knowledge-main", "widgetId": "legacy.widget", "satelliteId": "knowledge", "config": { "icon": "book-open" } }
+{ "instanceId": "knowledge-main", "widgetId": "knowledge.reading", "satelliteId": "knowledge", "config": {} }
 ```
 
 ---
 
 ### Tasks
 
-Requires a running Vikunja instance on the same Docker network.
+Requires a running [Vikunja](https://vikunja.io) instance on the same Docker network.
 
 ```yaml
-# docker-compose.yml
 services:
   vikunja-sat:
     image: ghcr.io/sensokame/homeport-vikunja:latest
@@ -210,10 +195,6 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
@@ -221,17 +202,16 @@ Add to `dashboard.json`:
 { "id": "vikunja", "url": "http://vikunja.station", "widgetUrl": "http://vikunja-sat:8080" }
 
 // widgets array in a tab
-{ "instanceId": "vikunja-main", "widgetId": "legacy.widget", "satelliteId": "vikunja", "config": { "icon": "check-square" } }
+{ "instanceId": "vikunja-main", "widgetId": "vikunja.task-overview", "satelliteId": "vikunja", "config": {} }
 ```
 
 ---
 
 ### Fitness
 
-Requires a running wger instance on the same Docker network.
+Requires a running [wger](https://wger.de) instance on the same Docker network.
 
 ```yaml
-# docker-compose.yml
 services:
   wger-sat:
     image: ghcr.io/sensokame/homeport-wger:latest
@@ -248,10 +228,6 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
@@ -259,17 +235,16 @@ Add to `dashboard.json`:
 { "id": "wger", "url": "http://wger.station", "widgetUrl": "http://wger-sat:8080" }
 
 // widgets array in a tab
-{ "instanceId": "wger-main", "widgetId": "legacy.widget", "satelliteId": "wger", "config": { "icon": "activity" } }
+{ "instanceId": "wger-main", "widgetId": "fitness.overview", "satelliteId": "wger", "config": {} }
 ```
 
 ---
 
 ### Budget
 
-Requires a running Actual Budget instance on the same Docker network.
+Requires a running [Actual Budget](https://actualbudget.org) server on the same Docker network.
 
 ```yaml
-# docker-compose.yml
 services:
   actual-sat:
     image: ghcr.io/sensokame/homeport-actual:latest
@@ -287,10 +262,6 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
@@ -298,22 +269,23 @@ Add to `dashboard.json`:
 { "id": "budget", "url": "http://budget.station", "widgetUrl": "http://actual-sat:8080" }
 
 // widgets array in a tab
-{ "instanceId": "budget-main", "widgetId": "legacy.widget", "satelliteId": "budget", "config": { "icon": "dollar-sign" } }
+{ "instanceId": "budget-main", "widgetId": "budget.overview", "satelliteId": "budget", "config": {} }
 ```
 
 ---
 
-### Workspace (optional)
+### Calendar
 
-Deploy this if you want workflow widgets — swipeable cards that combine multiple satellite widgets into a project-scoped view. See [Workspace](../satellites/workspace.md) for configuration.
+Configure a Google Calendar secret ICS address (or any iCal URL) in the `GCAL_ICS_URL` env var. No OAuth required.
 
 ```yaml
-# docker-compose.yml
 services:
-  workspace-sat:
-    image: ghcr.io/sensokame/homeport-workspace:latest
-    container_name: workspace-sat
+  gcal-sat:
+    image: ghcr.io/sensokame/homeport-gcal:latest
+    container_name: gcal-sat
     restart: unless-stopped
+    environment:
+      - GCAL_ICS_URL=https://calendar.google.com/calendar/ical/...
     networks:
       - proxy-network
 
@@ -322,29 +294,14 @@ networks:
     external: true
 ```
 
-```bash
-docker compose up -d
-```
-
 Add to `dashboard.json`:
 
 ```json
 // satellites array
-{ "id": "workspace", "url": "", "widgetUrl": "http://workspace-sat:8080" }
+{ "id": "gcal", "url": "http://gcal.station", "widgetUrl": "http://gcal-sat:8080" }
 
-// widgets array in a tab (one instance per workflow you want)
-{
-  "instanceId": "workspace-my-project",
-  "widgetId": "workspace.panel",
-  "satelliteId": "workspace",
-  "config": {
-    "label": "My Project",
-    "context": { "tags": ["my-project"] },
-    "slots": [
-      { "satelliteId": "vikunja", "widgetId": "vikunja.project-focus", "config": { "project_id": 1 } }
-    ]
-  }
-}
+// widgets array in a tab
+{ "instanceId": "gcal-main", "widgetId": "calendar.overview", "satelliteId": "gcal", "config": {} }
 ```
 
 ---
@@ -358,3 +315,4 @@ All containers attach to `proxy-network`. Use Nginx Proxy Manager (or any revers
 | `panel.station` | `hub` | 8080 |
 | `infra.station` | `infra` | 8080 |
 | `inventory.station` | `inventory` | 8080 |
+| `gcal.station` | `gcal-sat` | 8080 |

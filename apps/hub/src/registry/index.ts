@@ -1,7 +1,6 @@
 import { lazy } from 'react'
 import type { WidgetManifest } from '@homeport/ui'
 import { ClockWidget } from '../widgets/builtin/ClockWidget'
-import { LegacyWidget } from '../components/LegacyWidget'
 
 const TaskOverviewWidget     = lazy(() => import('vikunja/TaskOverviewWidget'))
 const ProjectFocusWidget     = lazy(() => import('vikunja/ProjectFocusWidget'))
@@ -20,16 +19,6 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: ClockWidget,
     defaultIcon: 'clock',
-  },
-  'legacy.widget': {
-    id: 'legacy.widget',
-    name: 'Widget',
-    description: 'Calls /widget on the satellite (legacy WidgetData API)',
-    configSchema: {
-      icon: { type: 'string', label: 'Icon name', required: false },
-    },
-    component: LegacyWidget,
-    fullScreen: true,
   },
   'knowledge.reading': {
     id: 'knowledge.reading',

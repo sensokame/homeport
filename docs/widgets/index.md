@@ -1,6 +1,6 @@
 # Widget System
 
-homeport's dashboard is built from **widgets** — self-contained React components that each satellite provides. The hub is a shell that arranges widgets into tabs according to a config file. The widgets themselves own their data fetching, layout, and interactivity.
+homeport's dashboard is built from **widgets** — self-contained React components that each satellite provides. The hub is a shell that arranges widgets into tabs according to `dashboard.json`. The widgets themselves own their data fetching, layout, and interactivity.
 
 ---
 
@@ -8,18 +8,13 @@ homeport's dashboard is built from **widgets** — self-contained React componen
 
 ```
 dashboard.json          widget registry         rendered hub
-─────────────────       ─────────────────       ─────────────────
-tab: Overview           vikunja.overview   ──►  SwipeableCard
-  widget:                 component              ├── home: all tasks
-    vikunja.overview      satelliteUrl           └── pages: per project
-    satelliteId: vikunja
-    config: {}
-
-tab: Overview           vikunja.project    ──►  Card
-  widget:                 component              └── RC tasks only
-    vikunja.project       satelliteUrl
-    satelliteId: vikunja
-    config: { project_id: 6 }
+─────────────────       ─────────────────       ──────────────────
+tab: Overview           vikunja.task-overview   ┌─ shell header ─┐
+  widget:                 component ──────────► │ Tasks          │
+    vikunja.task-overview satellite url         │ SwipeableCard  │
+    satelliteId: vikunja  config: {}            │  home: summary │
+    config: {}                                  │  pages: proj.  │
+                                                └── open →  ─────┘
 ```
 
 The hub only knows: *which widget goes where, and which satellite to talk to*. Everything else is the widget's concern.
@@ -34,18 +29,20 @@ Every widget component receives these props:
 
 ```typescript
 interface WidgetProps {
-  config: Record<string, unknown>  // instance config from dashboard.json
-  satelliteUrl: string             // proxy base URL: /api/proxy/{satelliteId}
-  publicUrl: string                // public URL for "open →" links
-  renderWidget: (
-    satelliteId: string,
-    widgetId: string,
-    config: Record<string, unknown>
-  ) => React.ReactNode             // hub-injected; use to compose other widgets
+  config: Record<string, unknown>       // instance config from dashboard.json
+  satelliteUrl: string                  // proxy base: /api/proxy/{satelliteId}
+  publicUrl: string                     // public URL for "open →" links
+  onStatusChange?: (status: 'ok' | 'warn' | 'error') => void
+  onFocusRequest?: () => void           // call to enter hub focus mode
+  isFocused?: boolean                   // true when hub is in focus mode for this widget
 }
 ```
 
-The hub always injects all four props. Widgets that don't compose others simply ignore `renderWidget`.
+`satelliteUrl` is always a relative path (`/api/proxy/{id}`) — the hub backend proxies all calls so widgets never talk directly to internal Docker URLs.
+
+`onStatusChange` drives the status dot in the widget shell header. Call it whenever your data changes: `'ok'` when everything is fine, `'warn'` when output needs attention, `'error'` when the widget cannot do its job.
+
+`onFocusRequest` is only present in the normal grid. When defined, show a "focus →" trigger. When the user activates focus mode, the hub re-renders your widget full-screen with `isFocused: true`.
 
 ### WidgetComponent
 
@@ -75,10 +72,12 @@ Declares a widget to the registry:
 ```typescript
 interface WidgetManifest {
   id: string                                // e.g. "vikunja.task-overview"
-  name: string                              // display name in settings drawer
+  name: string                              // shown in shell header + settings drawer
   description: string
   configSchema: Record<string, ConfigField> // empty object if no config needed
   component: WidgetComponent
+  fullScreen?: boolean                      // true → hub renders widget without shell wrapper
+  defaultIcon?: string                      // icon name from hub ICON_MAP; used when config.icon not set
 }
 ```
 
@@ -86,13 +85,12 @@ interface WidgetManifest {
 
 ## SwipeableCard
 
-`SwipeableCard` is an optional shell from `@homeport/ui` for widgets that have a home view and detail pages. Widgets that have nothing to swipe to can render a plain `<Card>` instead.
+`SwipeableCard` is the standard shell for widgets that have a home view and detail pages. It is content-only — the hub shell provides the card border, header, and footer.
 
 ```typescript
 interface SwipeableCardProps {
-  home: React.ReactNode       // always visible first
-  pages?: React.ReactNode[]   // additional pages, navigated by swipe or dot click
-  status?: 'ok' | 'warn' | 'error'
+  home: React.ReactNode        // always-visible first panel
+  pages?: React.ReactNode[]    // additional panels, navigated by swipe or dot click
 }
 ```
 
@@ -100,63 +98,20 @@ Usage:
 
 ```tsx
 <SwipeableCard
-  status="ok"
-  home={<TaskOverviewCard tasks={inProgressTasks} />}
+  home={<TaskSummaryPanel tasks={inProgress} />}
   pages={projects.map(p => (
-    <ProjectCard key={p.id} project={p} tasks={tasksByProject[p.id]} />
+    <ProjectPanel key={p.id} project={p} tasks={tasksByProject[p.id]} />
   ))}
 />
 ```
 
-**Pages are just React nodes.** A page can be a single `<Card>`, a row of cards, a list, a chart — anything. The `SwipeableCard` shell handles navigation (swipe gesture, dot indicators, home button). The cards themselves know nothing about swiping.
-
-**Do not nest `SwipeableCard` inside a page.** Gesture conflicts make the UX unusable. If a page needs deeper navigation, use expand/collapse or a separate route.
-
-### Navigation UX
-
-- Dot indicators at the bottom show current position (home + N pages)
-- Swipe left/right or click dots to navigate
-- A home button (visible on any detail page) returns to the home view
-
----
-
-## Widget composition
-
-Any Tier 2 widget can render other widgets inside itself using the `renderWidget` prop the hub injects. The hub handles all loading — whether the child is a Tier 1 data widget or a Tier 2 React component — so the composing widget never needs to know the difference.
-
-```tsx
-export function WorkspacePanelWidget({ config, renderWidget }: WidgetProps) {
-  const slots = config.slots as Array<{
-    satelliteId: string
-    widgetId: string
-    config: Record<string, unknown>
-  }>
-
-  return (
-    <SwipeableCard
-      home={<WorkspaceSummaryCard label={config.label as string} />}
-      pages={slots.map((slot, i) => (
-        <div key={i}>
-          {renderWidget(slot.satelliteId, slot.widgetId, slot.config)}
-        </div>
-      ))}
-    />
-  )
-}
-```
-
-**Rules:**
-- `renderWidget` is synchronous from the caller's perspective — the hub handles async loading and error boundaries internally
-- Do not nest `SwipeableCard` inside a rendered child widget's page — see the SwipeableCard section below
-- The child widget receives its own `satelliteUrl`, `publicUrl`, and `renderWidget` props normally — composition can be arbitrarily deep, though more than two levels is rarely useful
-
-**The workspace satellite** (`workspace-sat`) is a first party optional satellite that ships with homeport and is built entirely around this pattern. See [Workspace](../satellites/workspace.md) for details.
+Navigation: swipe left/right, dot indicators, `← home` button. Do not nest `SwipeableCard` inside another `SwipeableCard`'s pages — gesture conflicts will break navigation.
 
 ---
 
 ## dashboard.json
 
-Replaces `satellites.json` as the hub's config file. Defines satellite connection details, tabs, and widget instances.
+The hub reads `dashboard.json` on startup. Changes to tabs and widget instances can be made through the settings drawer (⚙ in the tab bar) — they are saved back to the file automatically.
 
 ```json
 {
@@ -180,10 +135,10 @@ Replaces `satellites.json` as the hub's config file. Defines satellite connectio
           "config": {}
         },
         {
-          "instanceId": "homeport-tasks",
+          "instanceId": "rc-tasks",
           "widgetId": "vikunja.project-focus",
           "satelliteId": "vikunja",
-          "config": { "project_id": 2 }
+          "config": { "project_id": 6 }
         }
       ]
     }
@@ -195,34 +150,47 @@ Replaces `satellites.json` as the hub's config file. Defines satellite connectio
 |---|---|
 | `satellites[].id` | Unique identifier, referenced by widget instances |
 | `satellites[].url` | Public URL used for "open →" links |
-| `satellites[].widgetUrl` | Internal URL the hub backend uses for API calls |
+| `satellites[].widgetUrl` | Internal Docker URL — stripped before sending to browser |
 | `tabs[].id` | URL-safe tab identifier |
 | `tabs[].label` | Display label in the tab bar |
-| `widgets[].instanceId` | Unique per-instance ID (allows multiple instances of the same widget) |
+| `widgets[].instanceId` | Unique per-instance ID — allows multiple instances of the same widget |
 | `widgets[].widgetId` | References a registered widget manifest |
 | `widgets[].satelliteId` | References a satellite entry above |
 | `widgets[].config` | Passed as `config` prop to the widget component |
 
-You can have **multiple instances of the same widget** with different configs — for example two `vikunja.project-focus` widgets on the same tab, each showing a different project.
+You can have **multiple instances of the same widget** with different configs — for example two `vikunja.project-focus` widgets on different tabs, each showing a different project.
 
 ---
 
 ## Widget registry
 
-The registry maps `widgetId → WidgetManifest`. Currently implemented as a static map in the hub (all widgets bundled at build time). The interface is identical to what a dynamic federation loader would consume.
+The registry maps `widgetId → WidgetManifest`. Satellite widgets are loaded at runtime via **module federation** — each satellite exposes a `remoteEntry.js`. The hub fetches and mounts it without a rebuild.
 
 ```typescript
 // apps/hub/src/registry/index.ts
-import { TaskOverviewWidget } from '@homeport/vikunja-widgets'
-import { ProjectFocusWidget } from '@homeport/vikunja-widgets'
+import { lazy } from 'react'
+import type { WidgetManifest } from '@homeport/ui'
+import { ClockWidget } from '../widgets/builtin/ClockWidget'
+
+const TaskOverviewWidget = lazy(() => import('vikunja/TaskOverviewWidget'))
+const ProjectFocusWidget = lazy(() => import('vikunja/ProjectFocusWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
+  'builtin.clock': {
+    id: 'builtin.clock',
+    name: 'Clock',
+    description: 'Current time display',
+    configSchema: {},
+    component: ClockWidget,
+    defaultIcon: 'clock',
+  },
   'vikunja.task-overview': {
     id: 'vikunja.task-overview',
-    name: 'Task Overview',
-    description: 'All in-progress tasks across projects',
+    name: 'Tasks',
+    description: 'All open tasks with per-project pages',
     configSchema: {},
     component: TaskOverviewWidget,
+    defaultIcon: 'check-square',
   },
   'vikunja.project-focus': {
     id: 'vikunja.project-focus',
@@ -232,70 +200,50 @@ export const registry: Record<string, WidgetManifest> = {
       project_id: { type: 'number', label: 'Project ID', required: true },
     },
     component: ProjectFocusWidget,
+    defaultIcon: 'folder',
   },
 }
 ```
 
 ---
 
-## Building a widget
+## Hub shell
 
-### 1. Create the component
+The hub wraps every non-`fullScreen` widget in a **shell** that provides consistent chrome:
+
+- **Top** — status dot + icon + `manifest.name` (hub-controlled; icon resolves `config.icon ?? manifest.defaultIcon`)
+- **Middle** — the widget component (satellite-controlled; can be a `SwipeableCard`, a plain div, anything)
+- **Bottom** — `open →` link to `publicUrl` (hub-controlled)
+
+Widgets receive `onStatusChange` from the shell. Call it to drive the status dot.
+
+### fullScreen mode
+
+Set `fullScreen: true` in `WidgetManifest` to opt out of the shell entirely. The hub renders the component directly with no wrapper. Use this only when the widget manages its own chrome. Most widgets should leave it unset.
+
+---
+
+## Focus mode
+
+Focus mode hides the hero bar, tab bar, and widget grid, and renders one widget full-screen.
+
+A widget participates in focus mode by:
+
+1. Showing a trigger when `onFocusRequest` is defined (normal grid view)
+2. Rendering a rich full-screen view when `isFocused` is `true`
 
 ```tsx
-// apps/vikunja/src/widgets/TaskOverviewWidget.tsx
-import { useEffect, useState } from 'react'
-import { SwipeableCard, Card } from '@homeport/ui'
-import type { WidgetProps } from '@homeport/ui'
-
-export function TaskOverviewWidget({ satelliteUrl, publicUrl, config, renderWidget }: WidgetProps) {
-  const [tasks, setTasks] = useState([])
-
-  useEffect(() => {
-    fetch(`${satelliteUrl}/api/tasks`)
-      .then(r => r.json())
-      .then(setTasks)
-  }, [satelliteUrl])
-
-  const inProgress = tasks.filter(t => !t.done)
-  const byProject = groupByProject(inProgress)
-
+export function MyWidget({ satelliteUrl, onFocusRequest, isFocused }: WidgetProps) {
+  if (isFocused) {
+    return <div className={styles.focusedView}>…</div>
+  }
   return (
-    <SwipeableCard
-      home={<TaskSummaryCard tasks={inProgress} />}
-      pages={Object.entries(byProject).map(([project, tasks]) => (
-        <ProjectCard key={project} project={project} tasks={tasks} />
-      ))}
-    />
+    <div className={styles.normalView}>
+      {onFocusRequest && (
+        <button onClick={onFocusRequest}>focus →</button>
+      )}
+    </div>
   )
-}
-```
-
-### 2. Register the manifest
-
-```typescript
-// apps/hub/src/registry/index.ts
-import { TaskOverviewWidget } from '../../vikunja/src/widgets/TaskOverviewWidget'
-
-export const registry = {
-  'vikunja.task-overview': {
-    id: 'vikunja.task-overview',
-    name: 'Task Overview',
-    description: 'All in-progress tasks across projects',
-    configSchema: {},
-    component: TaskOverviewWidget,
-  },
-}
-```
-
-### 3. Add an instance to dashboard.json
-
-```json
-{
-  "instanceId": "tasks-main",
-  "widgetId": "vikunja.task-overview",
-  "satelliteId": "vikunja",
-  "config": {}
 }
 ```
 
@@ -306,54 +254,44 @@ export const registry = {
 Widget IDs follow `<satellite>.<widget-name>` — all lowercase, hyphen-separated:
 
 ```
+builtin.clock
 vikunja.task-overview
 vikunja.project-focus
-infra.container-health
-infra.resource-usage
-inventory.stock-summary
-wger.workout-today
-actual.budget-overview
-actual.category-breakdown
+infra.overview
+inventory.overview
+knowledge.reading
+fitness.overview
+budget.overview
+calendar.overview
 ```
 
 ---
 
-## Hub shell
+## Built-in widget IDs
 
-The hub wraps every widget in a **shell** that provides the standard chrome:
-
-- **Top** — status dot + icon + widget name (hub-controlled; icon comes from `config.icon` in `dashboard.json`, status from `GET /widget`)
-- **Middle** — the widget component itself (satellite-controlled; can be a `SwipeableCard`, a plain `Card`, a chart, anything)
-- **Bottom** — `open →` link to the satellite's public URL (hub-controlled)
-
-This keeps widget components focused on data and layout — they never need to render status indicators or open links themselves.
-
-### Opting out — `fullScreen` mode
-
-A widget can opt out of the hub shell entirely by setting `fullScreen: true` in its `WidgetManifest`. The hub renders it without any wrapper:
-
-```typescript
-export const manifest: WidgetManifest = {
-  id: 'my-satellite.full-widget',
-  name: 'Full Widget',
-  fullScreen: true,   // hub renders nothing around this widget
-  // ...
-}
-```
-
-Use `fullScreen` only when the widget needs to own its own title, status presentation, or navigation chrome — for example a widget that already includes a `SwipeableCard` with custom header and footer. Most widgets should leave this unset.
-
-> **Not yet implemented.** The shell and `fullScreen` flag are part of the planned Phase 4 refactor. Currently the hub renders widgets directly with no wrapper.
+| Widget ID | Satellite | Description |
+|---|---|---|
+| `builtin.clock` | (none) | Current time |
+| `vikunja.task-overview` | `vikunja` | All tasks with per-project swipe pages |
+| `vikunja.project-focus` | `vikunja` | Tasks for one project (requires `project_id` in config) |
+| `infra.overview` | `infra` | Container status, CPU/RAM/disk |
+| `inventory.overview` | `inventory` | Stock overview and project needs |
+| `knowledge.reading` | `knowledge` | Currently reading books + Obsidian notes |
+| `fitness.overview` | `wger` | Workout status and nutrition log |
+| `budget.overview` | `budget` | Monthly spend vs. budgeted |
+| `calendar.overview` | `gcal` | Current calendar block with trade acknowledgment |
 
 ---
 
 ## Roadmap
 
-| Phase | What ships | Status |
+| Phase | What shipped | Status |
 |---|---|---|
-| **1** | `WidgetManifest`, `WidgetComponent`, `WidgetProps` interfaces in `@homeport/ui`; `SwipeableCard` component | ✅ Done |
-| **2** | Hub refactored: `dashboard.json` config, static widget registry, tab bar, settings drawer, proxy endpoint | ✅ Done |
-| **3** | Vikunja satellite migrated: `task-overview` and `project-focus` widgets as proof of concept | ✅ Done |
-| **4** | Hub shell: wraps every widget with status/icon header + `open →` footer; `fullScreen` flag lets widgets opt out; all remaining satellites migrated | 🔲 Next |
-| **5** | Module federation: each satellite ships `manifest.json` + `remoteEntry.js`; hub discovers and loads widgets at runtime without rebuild | 🔲 |
-| **6** | `workspace-sat`: first party optional satellite; `renderWidget` prop on hub; workflow widgets that compose other widgets into a project-scoped swipeable view | 🔲 |
+| 1 | `WidgetManifest`, `WidgetComponent`, `WidgetProps`, `SwipeableCard` | ✅ v0.6.0 |
+| 2 | `dashboard.json`, static registry, tab bar, proxy endpoint | ✅ v0.7.0 |
+| 3 | Vikunja widgets (`task-overview`, `project-focus`) as proof of concept | ✅ v0.7.0 |
+| 4 | `WidgetShell` — hub wraps every widget with status/icon header + `open →` footer | ✅ v0.8.0 |
+| 5 | Module federation — each satellite ships `remoteEntry.js`; hub loads at runtime | ✅ v0.8.0 |
+| 6 | Dashboard management UI — add from catalog, create/rename/delete tabs, drag-and-drop | ✅ v0.9.0 |
+| 7 | Focus mode — full-screen widget rendering with `onFocusRequest`/`isFocused` props | ✅ v0.9.0 |
+| 8 | PWA manifest + swipe tab switching (Lenovo P12 panel) | ✅ v1.0.0 |

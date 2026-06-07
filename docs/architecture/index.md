@@ -9,34 +9,35 @@
 │  renders tab bar + widget grid      │
 │  mounts widget components by id     │
 └──────┬──────────────────────────────┘
-       │  API calls (internal Docker network)
+       │  API proxying (internal Docker network)
        ├──────────────────► infra:8080
        ├──────────────────► inventory:8080
        ├──────────────────► knowledge:8080
        ├──────────────────► vikunja-sat:8080
        ├──────────────────► wger-sat:8080
        ├──────────────────► actual-sat:8080
-       └──────────────────► (any future satellite)
+       ├──────────────────► gcal-sat:8080
+       └──────────────────► (your satellite)
 ```
 
 The hub is a pure shell. It has no domain logic and no database. Everything domain-specific lives in the satellites and their widget components.
 
-API calls happen server-side (hub backend → satellite backend) to avoid CORS and keep satellites off the public internet.
+API calls happen server-side (hub backend → satellite backend) to avoid CORS and keep satellites off the public internet. Widget components in the browser use relative `/api/proxy/{id}/...` URLs — the hub backend forwards them to the satellite's internal Docker URL.
 
 ---
 
 ## Dashboard + widget system
 
-The hub renders a configurable dashboard of **widgets**. Each widget is a React component provided by a satellite. The hub places widgets into tabs according to `dashboard.json`.
+The hub renders a configurable dashboard of **widgets**. Each widget is a React component shipped by a satellite via module federation. The hub places them into tabs according to `dashboard.json`.
 
-See the [Widget System](../widgets/index.md) docs for the full architecture: interfaces, `SwipeableCard` pattern, `dashboard.json` schema, and how to build a widget.
+See the [Widget System](../widgets/index.md) docs for the full architecture: interfaces, `SwipeableCard` pattern, `dashboard.json` schema, and how to build a widget. To build your own satellite, see [Building a Satellite](../satellites/building-a-satellite.md).
 
-**Key properties of the system:**
+**Key properties:**
 
 - The same widget can appear multiple times with different config (e.g. two project-focus widgets for different projects)
-- Widgets decide their own layout — a flat card, a swipable card, a grid of cards, a chart
+- Widget components are loaded at runtime via module federation — adding a satellite doesn't require rebuilding the hub frontend (only a hub registry update + rebuild is needed)
 - The tab bar and settings drawer let users build their own dashboard without editing JSON
-- The static widget registry (bundled) will be replaced by module federation in a future release, with no changes required to widget code
+- Swipe left/right on the main content area to switch tabs (touch devices)
 
 ---
 
@@ -44,44 +45,26 @@ See the [Widget System](../widgets/index.md) docs for the full architecture: int
 
 **Widget satellites** expose one or more widget components and a backend API:
 
-- The hub mounts widget components in the dashboard grid
-- Each component fetches from its satellite's backend directly
-- Clicking "open →" links to the satellite's own full UI
+- Widgets are React components loaded by the hub via module federation
+- Each component fetches data through the hub proxy (`/api/proxy/{satelliteId}/...`)
+- The satellite also serves its own full-page UI at `url` (optional — the "open →" link)
 
-**Link cards** have no widget components — just a name and URL:
+**Builtin widgets** ship with the hub and need no satellite:
 
-- The hub renders a simple link card with an "open →" button
-- No integration code required
+- `builtin.clock` — current time display
 
-**Composition satellites** are widget satellites whose components use the `renderWidget` prop to embed other widgets. The hub injects `renderWidget` into every Tier 2 widget — any satellite can use it. `workspace-sat` is the first party example: it provides `workspace.panel`, a swipeable card whose pages are populated by widgets from other satellites. See [Widget composition](../widgets/index.md#widget-composition) and [Workspace](../satellites/workspace.md).
+**Link cards** have no widget components — just a satellite entry with a `url`:
+
+- Add the satellite entry to `dashboard.json` without a widget instance
+- Use `builtin.clock` or a future `builtin.link` widget type for a simple open → card
 
 ---
 
-## Legacy widget protocol (v1)
+## Homeport as a panel
 
-> The flat `/widget` endpoint is the v1 protocol, used by all current satellites. It will be replaced by the component-based widget system during the Phase 2–3 migration. Both protocols will coexist during the transition.
+homeport is designed to run on a wall-mounted panel (e.g. a tablet in always-on display mode). The PWA manifest enables full-screen installation. The touch-based tab switching (swipe left/right) and focus mode are built for this use case.
 
-Every first-party satellite currently exposes:
-
-```
-GET /widget
-Content-Type: application/json
-```
-
-Response schema:
-
-```json
-{
-  "title": "string",
-  "status": "ok | warn | error",
-  "summary": "string",
-  "metrics": [
-    { "label": "string", "value": "string or number", "alert": true }
-  ]
-}
-```
-
-If a satellite is unreachable, the hub returns `{ "status": "error", "summary": "unreachable" }` — the page never breaks.
+The satellite contract is the extension point: any service can become a panel widget by implementing `GET /api/catalog` and shipping a federated widget component. The hub never changes to add new domain knowledge — that lives in satellites.
 
 ---
 
@@ -92,7 +75,7 @@ homeport/
 ├── packages/
 │   └── ui/                  @homeport/ui — shared React component library
 │       ├── src/
-│       │   ├── components/  Card, WidgetCard, SwipeableCard, NavBar, …
+│       │   ├── components/  Card, SwipeableCard, NavBar, Badge, …
 │       │   └── tokens.css   CSS custom properties
 │       └── package.json
 ├── apps/
@@ -100,10 +83,8 @@ homeport/
 │   │   ├── backend/         FastAPI
 │   │   ├── src/
 │   │   │   └── registry/    Widget registry (widgetId → WidgetManifest)
+│   │   ├── public/          PWA manifest + icon
 │   │   ├── dashboard.json   Volume-mounted config
-│   │   └── Dockerfile
-│   ├── workspace/           Workspace satellite (first party, optional)
-│   │   ├── src/             React widget components (workspace.panel)
 │   │   └── Dockerfile
 │   ├── infra/               Infrastructure satellite
 │   │   ├── backend/         FastAPI + Docker SDK + psutil
@@ -122,10 +103,15 @@ homeport/
 │   │   └── Dockerfile
 │   ├── wger/                Fitness satellite
 │   │   ├── backend/         FastAPI — wger API wrapper
+│   │   ├── src/             Widget components
 │   │   └── Dockerfile
-│   └── actual/              Budget satellite
-│       ├── server/          Node.js + @actual-app/api
-│       ├── src/             React frontend + widget components
+│   ├── actual/              Budget satellite
+│   │   ├── server/          Node.js + @actual-app/api
+│   │   ├── src/             React frontend + widget components
+│   │   └── Dockerfile
+│   └── gcal/                Calendar satellite
+│       ├── backend/         Node.js — ICS parsing
+│       ├── src/             Widget components
 │       └── Dockerfile
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
@@ -135,11 +121,14 @@ homeport/
 
 ## Adding a new satellite
 
-1. Create `apps/<name>/` with a backend and React widget components
-2. Implement `GET /widget` (v1 protocol, for backward compat) and your API endpoints
-3. Write widget components implementing `WidgetComponent` from `@homeport/ui`
-4. Register manifests in `apps/hub/src/registry/index.ts`
-5. Add a satellite entry + widget instances to `dashboard.json`
-6. Add a `Dockerfile` and service to `internal.yml`
+See [Building a Satellite](../satellites/building-a-satellite.md) for the full guide.
 
-If your widget composes other widgets, use the `renderWidget` prop — no special registration or hub changes required. The hub injects it into every Tier 2 widget automatically.
+In short:
+
+1. Create `apps/<name>/` with a backend and React widget components
+2. Expose `GET /api/catalog` from the backend
+3. Write widget components implementing `WidgetProps` from `@homeport/ui`
+4. Configure module federation in the satellite's `vite.config.ts`
+5. Register in `apps/hub/src/registry/index.ts` (three files to update)
+6. Add a satellite entry + widget instances to `dashboard.json`
+7. Add a `Dockerfile` that serves everything on port 8080

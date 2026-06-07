@@ -88,6 +88,33 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  useEffect(() => {
+    if (focusedInstanceId || !dashboard || dashboard.tabs.length < 2) return
+    const ids = dashboard.tabs.map(t => t.id)
+    let startX = 0, startY = 0
+    function onTouchStart(e: TouchEvent) {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
+    function onTouchEnd(e: TouchEvent) {
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return
+      setActiveTabId(prev => {
+        const idx = ids.indexOf(prev ?? '')
+        if (dx < 0 && idx < ids.length - 1) return ids[idx + 1]
+        if (dx > 0 && idx > 0) return ids[idx - 1]
+        return prev
+      })
+    }
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [focusedInstanceId, dashboard])
+
   async function saveDashboard(updated: DashboardConfig) {
     setDashboard(updated)
     await fetch('/api/dashboard', {

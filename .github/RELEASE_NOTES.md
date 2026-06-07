@@ -1,43 +1,49 @@
-## homeport v0.2.0
+## homeport v1.0.0
 
-Widget system overhaul. The hub now renders rich, interactive widget components instead of flat data cards — and every widget gets consistent chrome provided by the hub.
+The first stable release. Dashboard management, module federation, focus mode, and the panel UX are all complete.
 
 ---
 
 ### What's new
 
-**Widget system (Phases 3 + 4)**
+**PWA support**
 
-- **`WidgetShell`** — the hub wraps every widget in a shell that provides a status indicator, icon, satellite name, and `open →` link. Widgets focus purely on data and layout.
-- **`fullScreen` manifest flag** — widgets that manage their own chrome can opt out of the shell entirely.
-- **`onStatusChange` callback** — widgets report their ok/warn/error status to the shell via a prop callback; no extra API call needed.
+- `manifest.webmanifest` with standalone display mode and homeport icon
+- Full-screen installation via "Add to Home Screen" on Android and iOS
+- `theme-color` meta tag for immersive status bar styling
 
-**Tasks widget (`vikunja.task-overview`)**
+**Swipe tab switching**
 
-- Replaces the flat summary card with a swipeable widget
-- Home page: "Overview" — total open tasks, due today, overdue, blocked counts
-- Per-project pages: swipe to see each project's full task list
-- Overdue tasks highlighted; blocked/waiting tasks badged
+- Swipe left/right anywhere on the widget grid to switch between tabs
+- Touch-first UX for wall-mounted panel use (e.g. Lenovo P12)
+- No conflict with focus mode or per-widget swipe cards — gesture is only active in the normal grid view
 
-**Blocked task tracking**
+**Legacy widget removal**
 
-- Tasks labelled `waiting` in Vikunja are surfaced as blocked items
-- Task description `waiting for: <what>` is parsed and shown in the widget
-- Satellite exposes `GET /api/blocked` — waiting tasks grouped by project with parsed reason
+- `legacy.widget` removed from the registry — all satellites now ship federated React components
+- `WidgetCard` and `WidgetData` removed from `@homeport/ui` — no longer needed
 
-**`SwipeableCard` improvements**
+**Documentation**
 
-- Now content-only (no Card wrapper) — the shell provides the card
-- Navigation: `← home` button + `‹ · dots · ›` arrows flanking the dot indicators
-- `overflow: hidden` scoped to the slide track only — fixes nav visibility bug
+- [Getting Started](https://sensokame.github.io/homeport/getting-started/) — corrected widget IDs for all satellites
+- [Widget System](https://sensokame.github.io/homeport/widgets/) — complete `WidgetProps` reference, federation pattern, focus mode
+- [Building a Satellite](https://sensokame.github.io/homeport/satellites/building-a-satellite/) — end-to-end guide for creating and registering a satellite
+- [Architecture](https://sensokame.github.io/homeport/architecture/) — panel concept, hub + satellite model, monorepo structure
+- [Calendar satellite](https://sensokame.github.io/homeport/satellites/gcal/) — new satellite doc
 
 ---
 
 ### Docker images
 
 ```
-ghcr.io/sensokame/homeport-hub:0.2.0
-ghcr.io/sensokame/homeport-vikunja:0.2.0
+ghcr.io/sensokame/homeport-hub:1.0.0
+ghcr.io/sensokame/homeport-infra:1.0.0
+ghcr.io/sensokame/homeport-inventory:1.0.0
+ghcr.io/sensokame/homeport-obsidian:1.0.0
+ghcr.io/sensokame/homeport-vikunja:1.0.0
+ghcr.io/sensokame/homeport-wger:1.0.0
+ghcr.io/sensokame/homeport-actual:1.0.0
+ghcr.io/sensokame/homeport-gcal:1.0.0
 ```
 
-Other satellite images are unchanged from v0.1.0.
+All satellite images are unchanged from v0.9.0 except hub.
