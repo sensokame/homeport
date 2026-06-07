@@ -74,6 +74,18 @@ def is_waiting(task: dict) -> bool:
     )
 
 
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "vikunja.task-overview", "name": "Tasks",
+         "description": "All open tasks with per-project pages; highlights overdue and blocked items",
+         "configSchema": {}},
+        {"id": "vikunja.project-focus", "name": "Project Focus",
+         "description": "Tasks for a single project",
+         "configSchema": {"project_id": {"type": "number", "label": "Project ID", "required": True}}},
+    ]}
+
+
 @app.get("/widget")
 def widget():
     try:

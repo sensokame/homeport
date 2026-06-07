@@ -58,6 +58,14 @@ app.get('/health', (_req, res) => {
   res.json({ status: ready ? 'ok' : 'error', error: initError });
 });
 
+app.get('/api/catalog', (_req, res) => {
+  res.json({ widgets: [
+    { id: 'budget.overview', name: 'Budget',
+      description: 'Current month budget summary — spent vs remaining',
+      configSchema: {} },
+  ]});
+});
+
 app.get('/widget', async (_req, res) => {
   if (!ready) {
     res.json({

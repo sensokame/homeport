@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Card, StatusDot } from '@homeport/ui'
 import type { WidgetManifest, WidgetProps } from '@homeport/ui'
 import { resolveIcon } from '../utils/icons'
@@ -16,10 +16,13 @@ interface WidgetShellProps {
 export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange, onFocusRequest }: WidgetShellProps) {
   const [status, setStatus] = useState<'ok' | 'warn' | 'error'>('ok')
 
-  const handleStatusChange = (s: 'ok' | 'warn' | 'error') => {
+  const onParentStatusChangeRef = useRef(onParentStatusChange)
+  useEffect(() => { onParentStatusChangeRef.current = onParentStatusChange }, [onParentStatusChange])
+
+  const handleStatusChange = useCallback((s: 'ok' | 'warn' | 'error') => {
     setStatus(s)
-    onParentStatusChange?.(s)
-  }
+    onParentStatusChangeRef.current?.(s)
+  }, [])
 
   const Widget = manifest.component
   const widgetProps: WidgetProps = {

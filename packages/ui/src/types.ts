@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, LazyExoticComponent } from 'react'
 
 export interface WidgetProps {
   config: Record<string, unknown>
@@ -14,6 +14,13 @@ export interface WidgetProps {
 
 export type WidgetComponent = ComponentType<WidgetProps>
 
+export interface CatalogWidget {
+  id: string
+  name: string
+  description: string
+  configSchema: Record<string, ConfigField>
+}
+
 export interface ConfigField {
   type: 'string' | 'number' | 'boolean'
   label: string
@@ -26,7 +33,7 @@ export interface WidgetManifest {
   name: string
   description: string
   configSchema: Record<string, ConfigField>
-  component: WidgetComponent
+  component: WidgetComponent | LazyExoticComponent<WidgetComponent>
   /**
    * When true, the hub renders the widget without its default shell (no status/icon
    * header, no "open →" footer). The widget is responsible for its own chrome.

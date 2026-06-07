@@ -173,6 +173,15 @@ def scan_vault_reading():
     return reading
 
 
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "knowledge.reading", "name": "Reading",
+         "description": "Currently reading books with per-book details and vault links",
+         "configSchema": {}},
+    ]}
+
+
 @app.get("/widget")
 def widget():
     books = fetch_goodreads() or scan_vault_reading()

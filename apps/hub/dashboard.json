@@ -43,8 +43,13 @@
       "label": "Overview",
       "widgets": [
         {
+          "instanceId": "clock-main",
+          "widgetId": "builtin.clock",
+          "config": {}
+        },
+        {
           "instanceId": "gcal-main",
-          "widgetId": "calendar.conscious-trade",
+          "widgetId": "calendar.overview",
           "satelliteId": "gcal",
           "config": {}
         },

@@ -78,6 +78,17 @@ def fetch_nutrition_today():
     return [e for e in data.get("results", []) if e.get("datetime", "").startswith(today)]
 
 
+# ── Catalog ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "fitness.overview", "name": "Fitness",
+         "description": "Today's workout status, active routine, and nutrition log count",
+         "configSchema": {}},
+    ]}
+
+
 # ── read endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/widget")

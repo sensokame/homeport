@@ -4,7 +4,7 @@ import styles from './SettingsDrawer.module.css'
 interface WidgetInstance {
   instanceId: string
   widgetId: string
-  satelliteId: string
+  satelliteId?: string
   config: Record<string, unknown>
 }
 

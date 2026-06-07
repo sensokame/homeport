@@ -157,6 +157,17 @@ class AssignmentCreate(BaseModel):
     notes: str = ""
 
 
+# ── Catalog ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "inventory.overview", "name": "Inventory",
+         "description": "Stock overview and per-project item needs",
+         "configSchema": {}},
+    ]}
+
+
 # ── Widget ────────────────────────────────────────────────────────────────────
 
 @app.get("/widget")

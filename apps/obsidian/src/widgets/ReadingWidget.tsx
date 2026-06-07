@@ -137,14 +137,12 @@ export function ReadingWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
     }
   }, [isFocused])
 
-  // 30s tick for countdown display while timer is running
   useEffect(() => {
     if (!isFocused || focusStage !== 'timer') return
     const id = setInterval(() => setTick(t => t + 1), 30_000)
     return () => clearInterval(id)
   }, [isFocused, focusStage])
 
-  // Exact timeout to flip to 'done' stage
   useEffect(() => {
     if (focusStage !== 'timer' || !timerStart) return
     const remaining = duration * 60_000 - (Date.now() - timerStart)

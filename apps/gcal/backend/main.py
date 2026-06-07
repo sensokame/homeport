@@ -68,6 +68,17 @@ async def _fetch_events_today() -> list[dict]:
     return events
 
 
+# ── Catalog ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "calendar.overview", "name": "Calendar",
+         "description": "Current calendar block with one-click trade acknowledgment",
+         "configSchema": {}},
+    ]}
+
+
 # ── Status ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/status")

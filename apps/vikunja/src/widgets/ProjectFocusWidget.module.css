@@ -18,6 +18,12 @@
   color: var(--color-text);
 }
 
+.projectName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .count {
   font-size: var(--text-xs);
   color: var(--color-muted);

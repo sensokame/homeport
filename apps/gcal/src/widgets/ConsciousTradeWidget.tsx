@@ -50,7 +50,6 @@ export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequ
       .finally(() => setLoading(false))
   }, [satelliteUrl])
 
-  // Drive countdown in focused mode
   useEffect(() => {
     if (!isFocused) return
     const id = setInterval(() => setTick(t => t + 1), 30_000)

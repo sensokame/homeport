@@ -55,6 +55,46 @@ async def put_dashboard(request: Request):
     return {"ok": True}
 
 
+@app.get("/api/catalog")
+async def catalog():
+    data = load_dashboard()
+    results = {}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for sat in data.get("satellites", []):
+            widget_url = sat.get("widgetUrl")
+            if not widget_url:
+                continue
+            try:
+                r = await client.get(widget_url.rstrip("/") + "/api/catalog")
+                results[sat["id"]] = r.json().get("widgets", [])
+            except Exception:
+                results[sat["id"]] = []
+    builtins = [
+        {"id": "builtin.clock", "name": "Clock",
+         "description": "Current time display", "configSchema": {}},
+    ]
+    return {"builtins": builtins, "satellites": results}
+
+
+@app.api_route("/api/remote/{satellite_id}/{path:path}", methods=["GET"])
+async def remote_asset(satellite_id: str, path: str, request: Request):
+    data = load_dashboard()
+    sat = next((s for s in data.get("satellites", []) if s["id"] == satellite_id), None)
+    if not sat or not sat.get("widgetUrl"):
+        raise HTTPException(status_code=404, detail=f"Satellite '{satellite_id}' not found")
+    target = sat["widgetUrl"].rstrip("/") + "/" + path
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        upstream = await client.get(target, headers={
+            k: v for k, v in request.headers.items()
+            if k.lower() not in ("host", "content-length")
+        })
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers=dict(upstream.headers),
+    )
+
+
 @app.api_route("/api/proxy/{satellite_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(satellite_id: str, path: str, request: Request):
     data = load_dashboard()

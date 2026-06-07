@@ -1,15 +1,25 @@
+import { lazy } from 'react'
 import type { WidgetManifest } from '@homeport/ui'
+import { ClockWidget } from '../widgets/builtin/ClockWidget'
 import { LegacyWidget } from '../components/LegacyWidget'
-import { TaskOverviewWidget } from '../widgets/vikunja/TaskOverviewWidget'
-import { ProjectFocusWidget } from '../widgets/vikunja/ProjectFocusWidget'
-import { InventoryOverviewWidget } from '../widgets/inventory/InventoryOverviewWidget'
-import { ReadingWidget } from '../widgets/knowledge/ReadingWidget'
-import { InfraWidget } from '../widgets/infra/InfraWidget'
-import { FitnessWidget } from '../widgets/fitness/FitnessWidget'
-import { BudgetWidget } from '../widgets/budget/BudgetWidget'
-import { ConsciousTradeWidget } from '../widgets/calendar/ConsciousTradeWidget'
+
+const TaskOverviewWidget     = lazy(() => import('vikunja/TaskOverviewWidget'))
+const ProjectFocusWidget     = lazy(() => import('vikunja/ProjectFocusWidget'))
+const BudgetWidget           = lazy(() => import('budget/BudgetWidget'))
+const CalendarWidget         = lazy(() => import('gcal/CalendarWidget'))
+const InfraWidget            = lazy(() => import('infra/InfraWidget'))
+const InventoryOverviewWidget = lazy(() => import('inventory/InventoryOverviewWidget'))
+const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
+const FitnessWidget          = lazy(() => import('wger/FitnessWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
+  'builtin.clock': {
+    id: 'builtin.clock',
+    name: 'Clock',
+    description: 'Current time display',
+    configSchema: {},
+    component: ClockWidget,
+  },
   'legacy.widget': {
     id: 'legacy.widget',
     name: 'Widget',
@@ -71,11 +81,11 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: BudgetWidget,
   },
-  'calendar.conscious-trade': {
-    id: 'calendar.conscious-trade',
-    name: 'Conscious Trade',
+  'calendar.overview': {
+    id: 'calendar.overview',
+    name: 'Calendar',
     description: 'Current calendar block with one-click trade acknowledgment',
     configSchema: {},
-    component: ConsciousTradeWidget,
+    component: CalendarWidget,
   },
 }

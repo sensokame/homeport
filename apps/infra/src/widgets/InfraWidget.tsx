@@ -51,19 +51,25 @@ export function InfraWidget({ satelliteUrl, onStatusChange }: WidgetProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${satelliteUrl}/widget`).then(r => r.json()),
-      fetch(`${satelliteUrl}/api/containers`).then(r => r.json()),
-    ])
-      .then(([widget, ctrs]: [WidgetData, Container[]]) => {
-        setData(widget)
-        setContainers(ctrs)
-        const anyDown = ctrs.some(c => c.status !== 'running')
-        onStatusChange?.(anyDown ? 'warn' : 'ok')
-      })
-      .catch(() => onStatusChange?.('error'))
-      .finally(() => setLoading(false))
-  }, [satelliteUrl])
+    function poll() {
+      Promise.all([
+        fetch(`${satelliteUrl}/widget`).then(r => r.json()),
+        fetch(`${satelliteUrl}/api/containers`).then(r => r.json()),
+      ])
+        .then(([widget, ctrs]: [WidgetData, Container[]]) => {
+          setData(widget)
+          setContainers(ctrs)
+          const anyDown = ctrs.some(c => c.status !== 'running')
+          onStatusChange?.(anyDown ? 'warn' : 'ok')
+        })
+        .catch(() => onStatusChange?.('error'))
+        .finally(() => setLoading(false))
+    }
+
+    poll()
+    const timer = setInterval(poll, 2_000)
+    return () => clearInterval(timer)
+  }, [satelliteUrl, onStatusChange])
 
   if (loading) return <div className={styles.panel}><p className={styles.empty}>Loading…</p></div>
   if (!data) return <div className={styles.panel}><p className={styles.empty}>Unavailable</p></div>

@@ -1,13 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import federation from '@originjs/vite-plugin-federation'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    federation({
+      name: 'inventory',
+      filename: 'remoteEntry.js',
+      exposes: {
+        './InventoryOverviewWidget': './src/widgets/InventoryOverviewWidget.entry',
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: '^18.3.0' },
+        'react-dom': { singleton: true, requiredVersion: '^18.3.0' },
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@homeport/ui': resolve(__dirname, '../../packages/ui/src'),
     },
+  },
+  build: {
+    target: 'esnext',
+    minify: false,
+    cssCodeSplit: false,
   },
   server: {
     proxy: {

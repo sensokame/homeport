@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { NavBar, StatusDot } from '@homeport/ui'
 import { registry } from './registry'
 import { TabBar } from './components/TabBar'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { WidgetShell } from './components/WidgetShell'
+import { WidgetErrorBoundary } from './components/WidgetErrorBoundary'
 import styles from './App.module.css'
 
 interface SatelliteEntry {
@@ -14,7 +15,7 @@ interface SatelliteEntry {
 interface WidgetInstance {
   instanceId: string
   widgetId: string
-  satelliteId: string
+  satelliteId?: string
   config: Record<string, unknown>
 }
 
@@ -114,7 +115,7 @@ export default function App() {
       {focusedInstance && (() => {
         const manifest = registry[focusedInstance.widgetId]
         if (!manifest) return null
-        const sat = satMap[focusedInstance.satelliteId]
+        const sat = focusedInstance.satelliteId ? satMap[focusedInstance.satelliteId] : undefined
         const Widget = manifest.component
         return (
           <div className={styles.focusedWrapper}>
@@ -123,13 +124,15 @@ export default function App() {
               <button className={styles.exitFocusBtn} onClick={() => setFocusedInstanceId(null)}>← back</button>
             </div>
             <div className={styles.focusedContent}>
-              <Widget
-                config={focusedInstance.config}
-                satelliteUrl={`/api/proxy/${focusedInstance.satelliteId}`}
-                publicUrl={sat?.url ?? ''}
-                isFocused={true}
-                onStatusChange={() => {}}
-              />
+              <Suspense fallback={<p className={styles.muted}>loading…</p>}>
+                <Widget
+                  config={focusedInstance.config}
+                  satelliteUrl={focusedInstance.satelliteId ? `/api/proxy/${focusedInstance.satelliteId}` : ''}
+                  publicUrl={sat?.url ?? ''}
+                  isFocused={true}
+                  onStatusChange={() => {}}
+                />
+              </Suspense>
             </div>
           </div>
         )
@@ -176,17 +179,20 @@ export default function App() {
                     </div>
                   )
                 }
-                const sat = satMap[instance.satelliteId]
+                const sat = instance.satelliteId ? satMap[instance.satelliteId] : undefined
                 return (
-                  <WidgetShell
-                    key={instance.instanceId}
-                    manifest={manifest}
-                    instance={instance}
-                    satelliteUrl={`/api/proxy/${instance.satelliteId}`}
-                    publicUrl={sat?.url ?? ''}
-                    onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
-                    onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
-                  />
+                  <WidgetErrorBoundary key={instance.instanceId} widgetId={instance.widgetId}>
+                  <Suspense fallback={<div className={styles.missingWidget}>loading…</div>}>
+                    <WidgetShell
+                      manifest={manifest}
+                      instance={instance}
+                      satelliteUrl={instance.satelliteId ? `/api/proxy/${instance.satelliteId}` : ''}
+                      publicUrl={sat?.url ?? ''}
+                      onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
+                      onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
+                    />
+                  </Suspense>
+                  </WidgetErrorBoundary>
                 )
               })}
             </div>

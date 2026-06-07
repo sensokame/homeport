@@ -1,6 +1,7 @@
 import os
 import subprocess
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -19,8 +20,19 @@ docker_client = docker.from_env()
 _update_lock = threading.Lock()
 _update_state: dict = {"running": False, "done": False, "results": []}
 
-# Warm up psutil CPU baseline — first call always returns 0.0
-psutil.cpu_percent()
+# Background CPU sampler — psutil.cpu_percent() measures delta since the last
+# call in the same process, so calling it from two endpoints races to 0%.
+# A single sampler thread avoids that by owning all cpu_percent() calls.
+_cpu_percent: float = 0.0
+
+def _cpu_sampler():
+    global _cpu_percent
+    psutil.cpu_percent()  # warmup — first call always returns 0.0
+    while True:
+        time.sleep(1)
+        _cpu_percent = psutil.cpu_percent()
+
+threading.Thread(target=_cpu_sampler, daemon=True).start()
 
 
 def _run_update():
@@ -82,6 +94,17 @@ def _compute_stats(c) -> dict | None:
         return None
 
 
+# ── Catalog ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/catalog")
+def catalog():
+    return {"widgets": [
+        {"id": "infra.overview", "name": "Infrastructure",
+         "description": "CPU, RAM, disk metrics and container status grouped by service group",
+         "configSchema": {}},
+    ]}
+
+
 # ── Widget ────────────────────────────────────────────────────────────────────
 
 @app.get("/widget")
@@ -98,7 +121,7 @@ def widget():
     else:
         status = "warn"
 
-    cpu = psutil.cpu_percent()
+    cpu = _cpu_percent
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
 
@@ -240,7 +263,7 @@ def group_action(group: str, action: str):
 
 @app.get("/api/system")
 def system_stats():
-    cpu = psutil.cpu_percent()
+    cpu = _cpu_percent
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     return {
