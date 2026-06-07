@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 DASHBOARD_PATH = Path(os.getenv("DASHBOARD_PATH", "/app/dashboard.json"))
 STATIC_DIR = Path(__file__).parent / "static"
-VERSION = "0.1.0"
+VERSION = "0.9.0"
 
 app = FastAPI()
 

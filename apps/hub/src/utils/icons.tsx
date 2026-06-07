@@ -1,5 +1,5 @@
 import {
-  Book, BookOpen, CheckSquare, DollarSign, Server, Package,
+  Book, BookOpen, CheckSquare, Clock, Calendar, DollarSign, Server, Package,
   Globe, Database, Folder, Settings, Activity, type LucideProps,
 } from 'lucide-react'
 
@@ -8,7 +8,9 @@ type IconComponent = React.ComponentType<LucideProps>
 const ICON_MAP: Record<string, IconComponent> = {
   'book':         Book,
   'book-open':    BookOpen,
+  'calendar':     Calendar,
   'check-square': CheckSquare,
+  'clock':        Clock,
   'dollar-sign':  DollarSign,
   'server':       Server,
   'package':      Package,

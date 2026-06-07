@@ -37,7 +37,7 @@ export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onSta
     return <Widget {...widgetProps} />
   }
 
-  const icon = resolveIcon(instance.config.icon as string | undefined)
+  const icon = resolveIcon((instance.config.icon as string | undefined) ?? manifest.defaultIcon)
 
   return (
     <Card status={status} className={styles.shell}>

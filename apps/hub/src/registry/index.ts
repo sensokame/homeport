@@ -19,6 +19,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Current time display',
     configSchema: {},
     component: ClockWidget,
+    defaultIcon: 'clock',
   },
   'legacy.widget': {
     id: 'legacy.widget',
@@ -36,6 +37,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Currently reading books with per-book details and vault links',
     configSchema: {},
     component: ReadingWidget,
+    defaultIcon: 'book-open',
   },
   'inventory.overview': {
     id: 'inventory.overview',
@@ -43,6 +45,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Stock overview and per-project item needs',
     configSchema: {},
     component: InventoryOverviewWidget,
+    defaultIcon: 'package',
   },
   'vikunja.task-overview': {
     id: 'vikunja.task-overview',
@@ -50,6 +53,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'All open tasks with per-project pages; highlights overdue and blocked items',
     configSchema: {},
     component: TaskOverviewWidget,
+    defaultIcon: 'check-square',
   },
   'vikunja.project-focus': {
     id: 'vikunja.project-focus',
@@ -59,6 +63,7 @@ export const registry: Record<string, WidgetManifest> = {
       project_id: { type: 'number', label: 'Project ID', required: true },
     },
     component: ProjectFocusWidget,
+    defaultIcon: 'folder',
   },
   'infra.overview': {
     id: 'infra.overview',
@@ -66,6 +71,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'CPU, RAM, disk metrics and container status grouped by service group',
     configSchema: {},
     component: InfraWidget,
+    defaultIcon: 'server',
   },
   'fitness.overview': {
     id: 'fitness.overview',
@@ -73,6 +79,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: "Today's workout status, active routine, and nutrition log count",
     configSchema: {},
     component: FitnessWidget,
+    defaultIcon: 'activity',
   },
   'budget.overview': {
     id: 'budget.overview',
@@ -80,6 +87,7 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Current month budget summary — spent vs remaining',
     configSchema: {},
     component: BudgetWidget,
+    defaultIcon: 'dollar-sign',
   },
   'calendar.overview': {
     id: 'calendar.overview',
@@ -87,5 +95,6 @@ export const registry: Record<string, WidgetManifest> = {
     description: 'Current calendar block with one-click trade acknowledgment',
     configSchema: {},
     component: CalendarWidget,
+    defaultIcon: 'calendar',
   },
 }

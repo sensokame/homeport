@@ -77,22 +77,111 @@ export default function App() {
     return () => clearInterval(timer)
   }, [])
 
-  async function handleRemoveWidget(tabId: string, instanceId: string) {
-    if (!dashboard) return
-    const updated: DashboardConfig = {
-      ...dashboard,
-      tabs: dashboard.tabs.map(tab =>
-        tab.id === tabId
-          ? { ...tab, widgets: tab.widgets.filter(w => w.instanceId !== instanceId) }
-          : tab
-      ),
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === ',' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        setSettingsOpen(prev => !prev)
+      }
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  async function saveDashboard(updated: DashboardConfig) {
     setDashboard(updated)
     await fetch('/api/dashboard', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated),
     })
+  }
+
+  async function handleRemoveWidget(tabId: string, instanceId: string) {
+    if (!dashboard) return
+    await saveDashboard({
+      ...dashboard,
+      tabs: dashboard.tabs.map(tab =>
+        tab.id === tabId
+          ? { ...tab, widgets: tab.widgets.filter(w => w.instanceId !== instanceId) }
+          : tab
+      ),
+    })
+  }
+
+  async function handleAddTab(label: string) {
+    if (!dashboard) return
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const id = `${slug}-${Date.now()}`
+    const newTab: TabEntry = { id, label, widgets: [] }
+    const updated = { ...dashboard, tabs: [...dashboard.tabs, newTab] }
+    setActiveTabId(id)
+    await saveDashboard(updated)
+  }
+
+  async function handleRenameTab(tabId: string, label: string) {
+    if (!dashboard) return
+    await saveDashboard({
+      ...dashboard,
+      tabs: dashboard.tabs.map(t => t.id === tabId ? { ...t, label } : t),
+    })
+  }
+
+  async function handleDeleteTab(tabId: string) {
+    if (!dashboard) return
+    const updated = { ...dashboard, tabs: dashboard.tabs.filter(t => t.id !== tabId) }
+    if (activeTabId === tabId) {
+      setActiveTabId(updated.tabs[0]?.id ?? null)
+    }
+    await saveDashboard(updated)
+  }
+
+  async function handleAddWidget(tabId: string, widgetId: string, satelliteId?: string) {
+    if (!dashboard) return
+    const instanceId = widgetId.replace(/\./g, '-') + '-' + Date.now()
+    const newWidget: WidgetInstance = {
+      instanceId,
+      widgetId,
+      ...(satelliteId ? { satelliteId } : {}),
+      config: {},
+    }
+    await saveDashboard({
+      ...dashboard,
+      tabs: dashboard.tabs.map(t =>
+        t.id === tabId ? { ...t, widgets: [...t.widgets, newWidget] } : t
+      ),
+    })
+  }
+
+  async function handleDropWidget(fromTabId: string, fromIndex: number, toTabId: string, toIndex: number) {
+    if (!dashboard) return
+    const fromTab = dashboard.tabs.find(t => t.id === fromTabId)
+    if (!fromTab) return
+    const widget = fromTab.widgets[fromIndex]
+    if (!widget) return
+
+    let tabs: typeof dashboard.tabs
+    if (fromTabId === toTabId) {
+      if (fromIndex === toIndex) return
+      const widgets = [...fromTab.widgets]
+      widgets.splice(fromIndex, 1)
+      // After removing the source item, indices > fromIndex shift left by 1
+      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+      widgets.splice(insertAt, 0, widget)
+      tabs = dashboard.tabs.map(t => t.id === fromTabId ? { ...t, widgets } : t)
+    } else {
+      const toTab = dashboard.tabs.find(t => t.id === toTabId)
+      if (!toTab) return
+      const fromWidgets = fromTab.widgets.filter((_, i) => i !== fromIndex)
+      const toWidgets = [...toTab.widgets]
+      toWidgets.splice(toIndex, 0, widget)
+      tabs = dashboard.tabs.map(t => {
+        if (t.id === fromTabId) return { ...t, widgets: fromWidgets }
+        if (t.id === toTabId) return { ...t, widgets: toWidgets }
+        return t
+      })
+    }
+    await saveDashboard({ ...dashboard, tabs })
   }
 
   const activeTab = dashboard?.tabs.find(t => t.id === activeTabId) ?? null
@@ -206,6 +295,11 @@ export default function App() {
           tabs={dashboard.tabs}
           registry={registry}
           onRemoveWidget={handleRemoveWidget}
+          onAddTab={handleAddTab}
+          onRenameTab={handleRenameTab}
+          onDeleteTab={handleDeleteTab}
+          onAddWidget={handleAddWidget}
+          onDropWidget={handleDropWidget}
         />
       )}
     </div>

@@ -10,7 +10,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 360px;
+  width: 380px;
   max-width: 90vw;
   background: var(--color-surface);
   border-left: 1px solid var(--color-border);
@@ -19,6 +19,8 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+/* ── Drawer header ─────────────────────────────── */
 
 .header {
   display: flex;
@@ -44,10 +46,9 @@
   padding: var(--space-1);
   line-height: 1;
 }
+.closeBtn:hover { color: var(--color-text); }
 
-.closeBtn:hover {
-  color: var(--color-text);
-}
+/* ── Drawer body ───────────────────────────────── */
 
 .body {
   flex: 1;
@@ -58,7 +59,20 @@
   gap: var(--space-6);
 }
 
-.section {}
+/* ── Tab section ───────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tabHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 
 .sectionTitle {
   font-size: var(--text-xs);
@@ -66,8 +80,88 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-muted);
-  margin-bottom: var(--space-3);
+  margin: 0;
 }
+
+.tabActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tabAction {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: 2px var(--space-2);
+  transition: color 0.15s, border-color 0.15s;
+}
+.tabAction:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.tabActionDanger {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: 2px var(--space-2);
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tabActionDanger:hover {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+/* ── Inline rename ─────────────────────────────── */
+
+.renameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.renameInput {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  outline: none;
+  min-width: 0;
+}
+.renameInput:focus {
+  border-color: var(--color-text);
+}
+
+.renameConfirm,
+.renameCancel {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.renameConfirm { color: var(--color-muted); }
+.renameConfirm:hover { color: var(--color-text); border-color: var(--color-text); }
+.renameCancel { color: var(--color-muted); }
+.renameCancel:hover { color: var(--color-error); border-color: var(--color-error); }
+
+/* ── Widget list ───────────────────────────────── */
 
 .empty {
   font-size: var(--text-sm);
@@ -92,6 +186,26 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  cursor: grab;
+}
+.item:active { cursor: grabbing; }
+.item button, .item select { cursor: pointer; }
+
+.itemDragging {
+  opacity: 0.4;
+}
+
+.itemDragOver {
+  border-color: var(--color-text);
+  box-shadow: 0 -2px 0 0 var(--color-text);
+}
+
+.dragHandle {
+  font-size: var(--text-base);
+  color: var(--color-muted);
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 1;
 }
 
 .itemInfo {
@@ -99,6 +213,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
 .itemName {
@@ -118,6 +233,29 @@
   text-overflow: ellipsis;
 }
 
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.moveSelect {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-1);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.moveSelect:hover {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
 .removeBtn {
   background: none;
   border: 1px solid var(--color-border);
@@ -127,10 +265,164 @@
   color: var(--color-muted);
   padding: 2px var(--space-2);
   flex-shrink: 0;
+  line-height: 1;
   transition: color 0.15s, border-color 0.15s;
 }
-
 .removeBtn:hover {
   color: var(--color-error);
   border-color: var(--color-error);
 }
+
+/* ── Drag-and-drop zones ───────────────────────── */
+
+.sectionDropTarget {
+  outline: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: calc(-1 * var(--space-2));
+}
+
+.appendZone {
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: var(--space-2) var(--space-4);
+  border: 1px dashed transparent;
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: border-color 0.1s, color 0.1s;
+}
+
+.appendZoneActive {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+.emptyDropZone {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: border-color 0.1s, color 0.1s;
+}
+
+.emptyDropZoneActive {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+/* ── Add widget button (per tab) ───────────────── */
+
+.addWidgetBtn {
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+.addWidgetBtn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+/* ── Add tab button ────────────────────────────── */
+
+.addTabBtn {
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+.addTabBtn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+/* ── Add tab modal (renders over drawer) ───────── */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+.addTabModal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  max-width: 90vw;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  z-index: 201;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modalTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.modalInput {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.modalInput:focus {
+  border-color: var(--color-text);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.modalCancel {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  padding: var(--space-2) var(--space-3);
+  transition: color 0.15s;
+}
+.modalCancel:hover { color: var(--color-text); }
+
+.modalConfirm {
+  background: var(--color-text);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-bg);
+  padding: var(--space-2) var(--space-3);
+  transition: opacity 0.15s;
+}
+.modalConfirm:hover { opacity: 0.85; }

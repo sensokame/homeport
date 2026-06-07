@@ -40,4 +40,6 @@ export interface WidgetManifest {
    * Defaults to false — most widgets should leave this unset.
    */
   fullScreen?: boolean
+  /** Icon name from the hub ICON_MAP to show in the shell header when config.icon is not set. */
+  defaultIcon?: string
 }
