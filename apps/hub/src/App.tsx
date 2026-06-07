@@ -281,37 +281,45 @@ export default function App() {
       <main className={styles.main} style={focusedInstance ? { display: 'none' } : undefined}>
         {loading ? (
           <p className={styles.muted}>loading…</p>
-        ) : !activeTab || activeTab.widgets.length === 0 ? (
-          <p className={styles.muted}>No widgets on this tab. Open settings to add some.</p>
         ) : (
           <div className={styles.content}>
-            <div className={styles.grid}>
-              {activeTab.widgets.map(instance => {
-                const manifest = registry[instance.widgetId]
-                if (!manifest) {
-                  return (
-                    <div key={instance.instanceId} className={styles.missingWidget}>
-                      Unknown widget: {instance.widgetId}
-                    </div>
-                  )
-                }
-                const sat = instance.satelliteId ? satMap[instance.satelliteId] : undefined
-                return (
-                  <WidgetErrorBoundary key={instance.instanceId} widgetId={instance.widgetId}>
-                  <Suspense fallback={<div className={styles.missingWidget}>loading…</div>}>
-                    <WidgetShell
-                      manifest={manifest}
-                      instance={instance}
-                      satelliteUrl={instance.satelliteId ? `/api/proxy/${instance.satelliteId}` : ''}
-                      publicUrl={sat?.url ?? ''}
-                      onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
-                      onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
-                    />
-                  </Suspense>
-                  </WidgetErrorBoundary>
-                )
-              })}
-            </div>
+            {dashboard?.tabs.map(tab => {
+              const isActive = tab.id === activeTabId
+              if (tab.widgets.length === 0) {
+                return isActive ? (
+                  <p key={tab.id} className={styles.muted}>No widgets on this tab. Open settings to add some.</p>
+                ) : null
+              }
+              return (
+                <div key={tab.id} className={styles.grid} style={isActive ? undefined : { display: 'none' }}>
+                  {tab.widgets.map(instance => {
+                    const manifest = registry[instance.widgetId]
+                    if (!manifest) {
+                      return (
+                        <div key={instance.instanceId} className={styles.missingWidget}>
+                          Unknown widget: {instance.widgetId}
+                        </div>
+                      )
+                    }
+                    const sat = instance.satelliteId ? satMap[instance.satelliteId] : undefined
+                    return (
+                      <WidgetErrorBoundary key={instance.instanceId} widgetId={instance.widgetId}>
+                      <Suspense fallback={<div className={styles.missingWidget}>loading…</div>}>
+                        <WidgetShell
+                          manifest={manifest}
+                          instance={instance}
+                          satelliteUrl={instance.satelliteId ? `/api/proxy/${instance.satelliteId}` : ''}
+                          publicUrl={sat?.url ?? ''}
+                          onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
+                          onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
+                        />
+                      </Suspense>
+                      </WidgetErrorBoundary>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
         )}
       </main>
