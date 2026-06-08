@@ -43,7 +43,7 @@
       "label": "Overview",
       "widgets": [
         {
-          "instanceId": "clock-main",
+          "instanceId": "builtin-clock-1780840876741",
           "widgetId": "builtin.clock",
           "config": {}
         },
@@ -59,6 +59,20 @@
           "satelliteId": "infra",
           "config": {}
         },
+        {
+          "instanceId": "knowledge-main",
+          "widgetId": "knowledge.reading",
+          "satelliteId": "knowledge",
+          "config": {
+            "icon": "book-open"
+          }
+        }
+      ]
+    },
+    {
+      "id": "focus-1780841652310",
+      "label": "productivity",
+      "widgets": [
         {
           "instanceId": "inventory-main",
           "widgetId": "inventory.overview",
@@ -80,14 +94,6 @@
           "widgetId": "fitness.overview",
           "satelliteId": "wger",
           "config": {}
-        },
-        {
-          "instanceId": "knowledge-main",
-          "widgetId": "knowledge.reading",
-          "satelliteId": "knowledge",
-          "config": {
-            "icon": "book-open"
-          }
         },
         {
           "instanceId": "budget-main",
