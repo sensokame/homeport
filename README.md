@@ -21,6 +21,7 @@ The hub reads `dashboard.json` and renders a configurable tab dashboard. Each sa
 | `apps/vikunja` | Tasks satellite — wraps Vikunja; shows due today and overdue |
 | `apps/wger` | Fitness satellite — wraps wger; shows workout and nutrition status |
 | `apps/actual` | Budget satellite — wraps Actual Budget; shows monthly spend summary |
+| `apps/gcal` | Calendar satellite — ICS-based calendar; current block + trade acknowledgment |
 
 ## Packages
 
