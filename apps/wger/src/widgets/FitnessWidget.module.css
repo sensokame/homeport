@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-5);
+  overflow-y: auto;
 }
 
 .header {
@@ -437,6 +438,12 @@
 .searchResult:hover {
   border-color: var(--color-link);
   color: var(--color-link);
+}
+
+/* ── SwipeableCard card container (default 360px height) ── */
+
+.cardContainer {
+  width: 100%;
 }
 
 /* ── SwipeableCard focus container ─────────────── */

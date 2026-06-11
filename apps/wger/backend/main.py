@@ -156,16 +156,34 @@ def get_today():
     nutrition = fetch_nutrition_today()
 
     workout_logs = []
+    logged: list[dict] = []
     if session:
         try:
             logs = wger_get("/workoutlog/", {"format": "json", "limit": 100, "workout": session["workout"]})
             workout_logs = logs.get("results", [])
+            set_counts: dict[int, int] = {}
+            for log in workout_logs:
+                eid = log["exercise"]
+                set_counts[eid] = set_counts.get(eid, 0) + 1
+            for eid, count in set_counts.items():
+                name = f"Exercise {eid}"
+                try:
+                    info = wger_get(f"/exerciseinfo/{eid}/")
+                    translations = info.get("translations", [])
+                    en = next((t for t in translations if t.get("language") == 2), None)
+                    best = en or (translations[0] if translations else None)
+                    if best:
+                        name = best.get("name", name)
+                except Exception:
+                    pass
+                logged.append({"exercise_id": eid, "name": name, "sets": count})
         except Exception:
             pass
 
     return {
         "session": session,
         "logs": workout_logs,
+        "logged": logged,
         "nutrition": nutrition,
     }
 

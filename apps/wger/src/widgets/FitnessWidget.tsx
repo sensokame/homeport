@@ -9,6 +9,7 @@ interface Exercise { id: number; name: string }
 interface DayInfo { id: number; name: string; exercises: Exercise[] }
 interface WeightEntry { id: number; date: string; weight: string }
 interface PR { exercise_id: number; name: string; best_weight: number; best_reps: number; date: string | null; type: 'weighted' | 'bodyweight' }
+interface LoggedExercise { exercise_id: number; name: string; sets: number }
 interface DiaryEntry { id: number; ingredient_id: number; ingredient_name: string; amount: string; energy: number; protein: number; carbohydrates: number; fat: number }
 interface Macros { energy: number; protein: number; carbohydrates: number; fat: number }
 interface Goals { energy: number | null; protein: number | null; carbohydrates: number | null; fat: number | null }
@@ -27,13 +28,17 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
   const [selectedDay, setSelectedDay] = useState<DayInfo | null>(null)
   const [sessionWorkoutId, setSessionWorkoutId] = useState<number | null>(null)
   const [setCounts, setSetCounts] = useState<Record<number, number>>({})
+  const sessionDayNameRef = useRef<string | null>(null)
 
-  // overview
+  // weight
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([])
   const [records, setRecords] = useState<PR[]>([])
   const [showLogWeight, setShowLogWeight] = useState(false)
   const [weightInput, setWeightInput] = useState('')
   const [loggingWeight, setLoggingWeight] = useState(false)
+
+  // logged
+  const [loggedExercises, setLoggedExercises] = useState<LoggedExercise[]>([])
 
   // meals
   const [diary, setDiary] = useState<DiaryEntry[]>([])
@@ -70,17 +75,45 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
   const [formUnit, setFormUnit] = useState<1 | 2>(1)
   const [submitting, setSubmitting] = useState(false)
 
+  // Load card data on mount: weight, schedule, meals, logged summary
   useEffect(() => {
-    fetch(`${satelliteUrl}/widget`)
-      .then(r => r.json())
-      .then((d: WidgetData) => {
-        setData(d)
-        onStatusChange?.(d.status === 'ok' ? 'ok' : d.status === 'error' ? 'error' : 'warn')
-      })
-      .catch(() => onStatusChange?.('error'))
-      .finally(() => setCardLoading(false))
+    Promise.all([
+      fetch(`${satelliteUrl}/widget`).then(r => r.json()),
+      fetch(`${satelliteUrl}/api/next-session`).then(r => r.json()),
+      fetch(`${satelliteUrl}/api/today`).then(r => r.json()),
+      fetch(`${satelliteUrl}/api/weight`).then(r => r.json()),
+      fetch(`${satelliteUrl}/api/today-meals`).then(r => r.json()),
+    ]).then(([wd, ns, today, wt, meals]) => {
+      setData(wd)
+      onStatusChange?.(wd.status === 'ok' ? 'ok' : wd.status === 'error' ? 'error' : 'warn')
+      setNextLetter(ns.next)
+      setTrainingDayToday(ns.training_day_today)
+      const counts: Record<number, number> = {}
+      for (const log of (today.logs ?? [])) counts[log.exercise] = (counts[log.exercise] ?? 0) + 1
+      setSetCounts(counts)
+      if (today.session) {
+        setSessionWorkoutId(today.session.workout)
+        sessionDayNameRef.current = (today.session.notes ?? '').trim()
+      }
+      setLoggedExercises(today.logged ?? [])
+      setWeightEntries(wt.entries ?? [])
+      setDiary(meals.entries ?? [])
+      setPlanId(meals.plan_id ?? null)
+      setTotals(meals.totals ?? null)
+      setGoals(meals.goals ?? null)
+      if (meals.goals) {
+        setGoalInputs({
+          energy: meals.goals.energy?.toString() ?? '',
+          protein: meals.goals.protein?.toString() ?? '',
+          carbohydrates: meals.goals.carbohydrates?.toString() ?? '',
+          fat: meals.goals.fat?.toString() ?? '',
+        })
+      }
+    }).catch(() => onStatusChange?.('error'))
+    .finally(() => setCardLoading(false))
   }, [satelliteUrl])
 
+  // Load focus-only data: all days + personal records
   useEffect(() => {
     if (!isFocused) return
     setPhase('loading')
@@ -90,39 +123,14 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
     setExplainId(null)
 
     Promise.all([
-      fetch(`${satelliteUrl}/api/next-session`).then(r => r.json()),
       fetch(`${satelliteUrl}/api/all-days`).then(r => r.json()),
-      fetch(`${satelliteUrl}/api/today`).then(r => r.json()),
-      fetch(`${satelliteUrl}/api/weight`).then(r => r.json()),
       fetch(`${satelliteUrl}/api/records`).then(r => r.json()),
-      fetch(`${satelliteUrl}/api/today-meals`).then(r => r.json()),
-    ]).then(([ns, ad, today, wt, rec, meals]) => {
-      setNextLetter(ns.next)
-      setTrainingDayToday(ns.training_day_today)
+    ]).then(([ad, rec]) => {
       const days: DayInfo[] = ad.days ?? []
       setAllDays(days)
-      const counts: Record<number, number> = {}
-      for (const log of (today.logs ?? [])) counts[log.exercise] = (counts[log.exercise] ?? 0) + 1
-      setSetCounts(counts)
-      if (today.session) {
-        setSessionWorkoutId(today.session.workout)
-        const dayName = (today.session.notes ?? '').trim()
-        setSelectedDay(days.find(d => d.name === dayName) ?? days[0] ?? null)
-      }
-      setWeightEntries(wt.entries ?? [])
       setRecords(rec.records ?? [])
-      setDiary(meals.entries ?? [])
-      setPlanId(meals.plan_id ?? null)
-      setTotals(meals.totals ?? null)
-      setGoals(meals.goals ?? null)
-      if (meals.goals) {
-        setGoalInputs({
-          energy: meals.goals.energy ?? '',
-          protein: meals.goals.protein ?? '',
-          carbohydrates: meals.goals.carbohydrates ?? '',
-          fat: meals.goals.fat ?? '',
-        })
-      }
+      const dayName = sessionDayNameRef.current
+      setSelectedDay(days.find(d => d.name === (dayName ?? '')) ?? days[0] ?? null)
       setPhase('ready')
     }).catch(() => setPhase('ready'))
   }, [isFocused, satelliteUrl])
@@ -173,6 +181,11 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
         body: JSON.stringify({ exercise_id: exerciseId, workout_id: workoutId, repetitions: parseInt(formReps) || 1, weight: parseFloat(formWeight) || 0, weight_unit: formUnit }),
       })
       setSetCounts(prev => ({ ...prev, [exerciseId]: (prev[exerciseId] ?? 0) + 1 }))
+      setLoggedExercises(prev => {
+        const existing = prev.find(e => e.exercise_id === exerciseId)
+        if (existing) return prev.map(e => e.exercise_id === exerciseId ? { ...e, sets: e.sets + 1 } : e)
+        return [...prev, { exercise_id: exerciseId, name: selectedDay?.exercises.find(e => e.id === exerciseId)?.name ?? `Exercise ${exerciseId}`, sets: 1 }]
+      })
       setActiveId(null)
     } finally { setSubmitting(false) }
   }
@@ -283,79 +296,6 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
     if (phase === 'loading') {
       return <div className={styles.focusedPanel}><div className={styles.focusedBlock}><p className={styles.empty}>Loading…</p></div></div>
     }
-
-    const weightDelta = weightEntries.length > 1
-      ? parseFloat(weightEntries[0].weight) - parseFloat(weightEntries[1].weight)
-      : null
-
-    // ── Overview ──────────────────────────────────────────────────────────────
-    const overviewPanel = (
-      <div className={styles.panelContent}>
-        <span className={styles.panelTitle}>overview</span>
-
-        <section className={styles.overviewSection}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionLabel}>body weight</span>
-            <button className={styles.actionBtn} onClick={() => setShowLogWeight(v => !v)}>
-              {showLogWeight ? 'cancel' : 'log'}
-            </button>
-          </div>
-          {weightEntries.length > 0 ? (
-            <>
-              <div className={styles.weightMain}>
-                <span className={styles.weightValue}>{weightEntries[0].weight} kg</span>
-                {weightDelta !== null && weightDelta !== 0 && (
-                  <span className={weightDelta > 0 ? styles.weightUp : styles.weightDown}>
-                    {weightDelta > 0 ? '▲' : '▼'} {Math.abs(weightDelta).toFixed(1)}
-                  </span>
-                )}
-              </div>
-              <div className={styles.weightHistory}>
-                {weightEntries.slice(0, 4).map(e => (
-                  <span key={e.id} className={styles.weightHistoryItem}>{e.weight} · {e.date.slice(5)}</span>
-                ))}
-              </div>
-            </>
-          ) : <p className={styles.empty}>No entries yet</p>}
-          {showLogWeight && (
-            <div className={styles.logForm}>
-              <input className={styles.logInput} type="number" placeholder="kg" value={weightInput}
-                onChange={e => setWeightInput(e.target.value)} step={0.1} autoFocus />
-              <button className={styles.submitBtn} onClick={handleLogWeight} disabled={loggingWeight || !weightInput}>
-                {loggingWeight ? '…' : 'Save'}
-              </button>
-            </div>
-          )}
-        </section>
-
-        <section className={styles.overviewSection}>
-          <span className={styles.sectionLabel}>schedule</span>
-          <p className={styles.scheduleInfo}>
-            {sessionWorkoutId
-              ? `${selectedDay?.name ?? 'Session'} ✓`
-              : trainingDayToday
-                ? `Session ${nextLetter} — training day`
-                : `Rest day · Session ${nextLetter} up next`}
-          </p>
-        </section>
-
-        {records.length > 0 && (
-          <section className={styles.overviewSection}>
-            <span className={styles.sectionLabel}>personal records</span>
-            <div className={styles.recordsList}>
-              {records.map(r => (
-                <div key={r.exercise_id} className={styles.recordRow}>
-                  <span className={styles.recordName}>{r.name}</span>
-                  <span className={styles.recordValue}>
-                    {r.type === 'weighted' ? `${r.best_weight} kg × ${r.best_reps}` : `${r.best_reps} reps`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-    )
 
     // ── Workout ───────────────────────────────────────────────────────────────
     const workoutPanel = (
@@ -489,167 +429,241 @@ export function FitnessWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
       </div>
     )
 
-    // ── Meals ─────────────────────────────────────────────────────────────────
-    const mealsPanel = (
+    // ── PRs ───────────────────────────────────────────────────────────────────
+    const prsPanel = (
       <div className={styles.panelContent}>
-        <div className={styles.mealsPanelHeader}>
-          <span className={styles.panelTitle}>meals</span>
-          <button className={styles.actionBtn} onClick={() => {
-            setShowGoalEdit(v => !v)
-            if (!showGoalEdit && goals) setGoalInputs({
-              energy: goals.energy?.toString() ?? '',
-              protein: goals.protein?.toString() ?? '',
-              carbohydrates: goals.carbohydrates?.toString() ?? '',
-              fat: goals.fat?.toString() ?? '',
-            })
-          }}>
-            {showGoalEdit ? 'cancel' : 'set goals'}
-          </button>
-        </div>
-
-        {/* Macro totals */}
-        {totals && (
-          <div className={styles.macroGrid}>
-            {(['energy', 'protein', 'carbohydrates', 'fat'] as const).map(key => {
-              const goal = goals?.[key]
-              const val = totals[key]
-              const label = key === 'carbohydrates' ? 'carbs' : key
-              const unit = key === 'energy' ? 'kcal' : 'g'
-              return (
-                <div key={key} className={styles.macroCell}>
-                  <span className={styles.macroLabel}>{label}</span>
-                  <span className={styles.macroValue}>{Math.round(val)}<span className={styles.macroUnit}>{unit}</span></span>
-                  {goal != null && (
-                    <span className={styles.macroGoal}>/ {Math.round(goal)}</span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Goal editor */}
-        {showGoalEdit && (
-          <div className={styles.goalEditor}>
-            <div className={styles.goalGrid}>
-              {(['energy', 'protein', 'carbohydrates', 'fat'] as const).map(key => (
-                <div key={key} className={styles.goalField}>
-                  <label className={styles.goalLabel}>{key === 'carbohydrates' ? 'carbs' : key}</label>
-                  <input className={styles.logInput} type="number" placeholder={key === 'energy' ? 'kcal' : 'g'}
-                    value={goalInputs[key]}
-                    onChange={e => setGoalInputs(prev => ({ ...prev, [key]: e.target.value }))}
-                    min={0} />
-                </div>
-              ))}
-            </div>
-            <button className={styles.submitBtn} onClick={handleSaveGoals} disabled={savingGoals}>
-              {savingGoals ? '…' : 'Save goals'}
-            </button>
-          </div>
-        )}
-
-        {/* Diary entries */}
-        {diary.length > 0 ? (
-          <div className={styles.diaryList}>
-            {diary.map(e => (
-              <div key={e.id} className={styles.diaryEntry}>
-                <div className={styles.diaryRow}>
-                  <span className={styles.diaryName}>{e.ingredient_name}</span>
-                  <div className={styles.diaryActions}>
-                    {editingDiaryId === e.id ? (
-                      <>
-                        <input className={styles.diaryAmountInput} type="number" value={editAmount}
-                          onChange={ev => setEditAmount(ev.target.value)} min={0} autoFocus />
-                        <button className={styles.actionBtn} onClick={() => handleEditDiary(e.id)} disabled={savingEdit}>
-                          {savingEdit ? '…' : '✓'}
-                        </button>
-                        <button className={styles.actionBtn} onClick={() => setEditingDiaryId(null)}>×</button>
-                      </>
-                    ) : (
-                      <>
-                        <button className={styles.diaryAmountBtn}
-                          onClick={() => { setEditingDiaryId(e.id); setEditAmount(parseFloat(e.amount).toFixed(0)) }}>
-                          {parseFloat(e.amount).toFixed(0)} g
-                        </button>
-                        <button className={styles.actionBtn} onClick={() => handleDeleteDiary(e.id)}>×</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {e.energy > 0 && (
-                  <div className={styles.diaryMacros}>
-                    <span>{Math.round(e.energy)} kcal</span>
-                    <span>P {e.protein.toFixed(1)}g</span>
-                    <span>C {e.carbohydrates.toFixed(1)}g</span>
-                    <span>F {e.fat.toFixed(1)}g</span>
-                  </div>
-                )}
+        <span className={styles.panelTitle}>personal records</span>
+        {records.length > 0 ? (
+          <div className={styles.recordsList}>
+            {records.map(r => (
+              <div key={r.exercise_id} className={styles.recordRow}>
+                <span className={styles.recordName}>{r.name}</span>
+                <span className={styles.recordValue}>
+                  {r.type === 'weighted' ? `${r.best_weight} kg × ${r.best_reps}` : `${r.best_reps} reps`}
+                </span>
               </div>
             ))}
           </div>
-        ) : <p className={styles.empty}>Nothing logged today</p>}
-
-        {/* Add food */}
-        {selectedIng ? (
-          <div className={styles.mealForm}>
-            <span className={styles.selectedIngName}>{selectedIng.name}</span>
-            <div className={styles.logForm}>
-              <input className={styles.logInput} type="number" placeholder="g / ml"
-                value={mealAmount} onChange={e => setMealAmount(e.target.value)} min={0} autoFocus />
-              <button className={styles.submitBtn} onClick={handleLogMeal} disabled={loggingMeal || !mealAmount}>
-                {loggingMeal ? '…' : 'Log'}
-              </button>
-              <button className={styles.actionBtn} onClick={() => { setSelectedIng(null); setMealAmount('') }}>×</button>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.replacePanel}>
-            <input className={styles.searchInput} type="text" placeholder="Search food…"
-              value={mealQuery} onChange={e => setMealQuery(e.target.value)} />
-            {mealSearching && <p className={styles.searchHint}>Searching…</p>}
-            {!mealSearching && mealResults.length > 0 && (
-              <div className={styles.searchResults}>
-                {mealResults.slice(0, 5).map(r => (
-                  <button key={r.id} className={styles.searchResult}
-                    onClick={() => { setSelectedIng(r); setMealQuery(''); setMealResults([]) }}>
-                    {r.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        ) : <p className={styles.empty}>No records yet</p>}
       </div>
     )
 
     return (
       <div className={styles.swipeableContainer}>
-        <SwipeableCard home={overviewPanel} pages={[workoutPanel, mealsPanel]} />
+        <SwipeableCard home={workoutPanel} pages={[prsPanel]} />
       </div>
     )
   }
 
-  // ── Normal card ───────────────────────────────────────────────────────────────
+  // ── Normal card (SwipeableCard: overview / logged / meals) ────────────────────
 
   if (cardLoading) return <div className={styles.panel}><p className={styles.empty}>Loading…</p></div>
-  if (!data) return <div className={styles.panel}><p className={styles.empty}>Unavailable</p></div>
+
+  const weightDelta = weightEntries.length > 1
+    ? parseFloat(weightEntries[0].weight) - parseFloat(weightEntries[1].weight)
+    : null
+
+  // ── Overview panel ────────────────────────────────────────────────────────
+  const overviewPanel = (
+    <div className={styles.panelContent}>
+      <section className={styles.overviewSection}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionLabel}>body weight</span>
+          <button className={styles.actionBtn} onClick={() => setShowLogWeight(v => !v)}>
+            {showLogWeight ? 'cancel' : 'log'}
+          </button>
+        </div>
+        {weightEntries.length > 0 ? (
+          <>
+            <div className={styles.weightMain}>
+              <span className={styles.weightValue}>{weightEntries[0].weight} kg</span>
+              {weightDelta !== null && weightDelta !== 0 && (
+                <span className={weightDelta > 0 ? styles.weightUp : styles.weightDown}>
+                  {weightDelta > 0 ? '▲' : '▼'} {Math.abs(weightDelta).toFixed(1)}
+                </span>
+              )}
+            </div>
+            <div className={styles.weightHistory}>
+              {weightEntries.slice(0, 4).map(e => (
+                <span key={e.id} className={styles.weightHistoryItem}>{e.weight} · {e.date.slice(5)}</span>
+              ))}
+            </div>
+          </>
+        ) : <p className={styles.empty}>No entries yet</p>}
+        {showLogWeight && (
+          <div className={styles.logForm}>
+            <input className={styles.logInput} type="number" placeholder="kg" value={weightInput}
+              onChange={e => setWeightInput(e.target.value)} step={0.1} autoFocus />
+            <button className={styles.submitBtn} onClick={handleLogWeight} disabled={loggingWeight || !weightInput}>
+              {loggingWeight ? '…' : 'Save'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className={styles.overviewSection}>
+        <span className={styles.sectionLabel}>schedule</span>
+        <p className={styles.scheduleInfo}>
+          {sessionWorkoutId
+            ? `${sessionDayNameRef.current ?? 'Session'} ✓`
+            : trainingDayToday
+              ? `Session ${nextLetter} — training day`
+              : `Rest day · Session ${nextLetter} up next`}
+        </p>
+        {onFocusRequest && (
+          <button className={styles.focusBtn} onClick={onFocusRequest}>workout →</button>
+        )}
+      </section>
+    </div>
+  )
+
+  // ── Logged panel ──────────────────────────────────────────────────────────
+  const loggedPanel = (
+    <div className={styles.panelContent}>
+      <span className={styles.panelTitle}>logged today</span>
+      {loggedExercises.length > 0 ? (
+        <div className={styles.recordsList}>
+          {loggedExercises.map(ex => (
+            <div key={ex.exercise_id} className={styles.recordRow}>
+              <span className={styles.recordName}>{ex.name}</span>
+              <span className={styles.recordValue}>{ex.sets} set{ex.sets !== 1 ? 's' : ''}</span>
+            </div>
+          ))}
+        </div>
+      ) : <p className={styles.empty}>No session today</p>}
+    </div>
+  )
+
+  // ── Meals panel ───────────────────────────────────────────────────────────
+  const mealsPanel = (
+    <div className={styles.panelContent}>
+      <div className={styles.mealsPanelHeader}>
+        <span className={styles.panelTitle}>meals</span>
+        <button className={styles.actionBtn} onClick={() => {
+          setShowGoalEdit(v => !v)
+          if (!showGoalEdit && goals) setGoalInputs({
+            energy: goals.energy?.toString() ?? '',
+            protein: goals.protein?.toString() ?? '',
+            carbohydrates: goals.carbohydrates?.toString() ?? '',
+            fat: goals.fat?.toString() ?? '',
+          })
+        }}>
+          {showGoalEdit ? 'cancel' : 'set goals'}
+        </button>
+      </div>
+
+      {totals && (
+        <div className={styles.macroGrid}>
+          {(['energy', 'protein', 'carbohydrates', 'fat'] as const).map(key => {
+            const goal = goals?.[key]
+            const val = totals[key]
+            const label = key === 'carbohydrates' ? 'carbs' : key
+            const unit = key === 'energy' ? 'kcal' : 'g'
+            return (
+              <div key={key} className={styles.macroCell}>
+                <span className={styles.macroLabel}>{label}</span>
+                <span className={styles.macroValue}>{Math.round(val)}<span className={styles.macroUnit}>{unit}</span></span>
+                {goal != null && <span className={styles.macroGoal}>/ {Math.round(goal)}</span>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {showGoalEdit && (
+        <div className={styles.goalEditor}>
+          <div className={styles.goalGrid}>
+            {(['energy', 'protein', 'carbohydrates', 'fat'] as const).map(key => (
+              <div key={key} className={styles.goalField}>
+                <label className={styles.goalLabel}>{key === 'carbohydrates' ? 'carbs' : key}</label>
+                <input className={styles.logInput} type="number" placeholder={key === 'energy' ? 'kcal' : 'g'}
+                  value={goalInputs[key]}
+                  onChange={e => setGoalInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                  min={0} />
+              </div>
+            ))}
+          </div>
+          <button className={styles.submitBtn} onClick={handleSaveGoals} disabled={savingGoals}>
+            {savingGoals ? '…' : 'Save goals'}
+          </button>
+        </div>
+      )}
+
+      {diary.length > 0 ? (
+        <div className={styles.diaryList}>
+          {diary.map(e => (
+            <div key={e.id} className={styles.diaryEntry}>
+              <div className={styles.diaryRow}>
+                <span className={styles.diaryName}>{e.ingredient_name}</span>
+                <div className={styles.diaryActions}>
+                  {editingDiaryId === e.id ? (
+                    <>
+                      <input className={styles.diaryAmountInput} type="number" value={editAmount}
+                        onChange={ev => setEditAmount(ev.target.value)} min={0} autoFocus />
+                      <button className={styles.actionBtn} onClick={() => handleEditDiary(e.id)} disabled={savingEdit}>
+                        {savingEdit ? '…' : '✓'}
+                      </button>
+                      <button className={styles.actionBtn} onClick={() => setEditingDiaryId(null)}>×</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className={styles.diaryAmountBtn}
+                        onClick={() => { setEditingDiaryId(e.id); setEditAmount(parseFloat(e.amount).toFixed(0)) }}>
+                        {parseFloat(e.amount).toFixed(0)} g
+                      </button>
+                      <button className={styles.actionBtn} onClick={() => handleDeleteDiary(e.id)}>×</button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {e.energy > 0 && (
+                <div className={styles.diaryMacros}>
+                  <span>{Math.round(e.energy)} kcal</span>
+                  <span>P {e.protein.toFixed(1)}g</span>
+                  <span>C {e.carbohydrates.toFixed(1)}g</span>
+                  <span>F {e.fat.toFixed(1)}g</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : <p className={styles.empty}>Nothing logged today</p>}
+
+      {selectedIng ? (
+        <div className={styles.mealForm}>
+          <span className={styles.selectedIngName}>{selectedIng.name}</span>
+          <div className={styles.logForm}>
+            <input className={styles.logInput} type="number" placeholder="g / ml"
+              value={mealAmount} onChange={e => setMealAmount(e.target.value)} min={0} autoFocus />
+            <button className={styles.submitBtn} onClick={handleLogMeal} disabled={loggingMeal || !mealAmount}>
+              {loggingMeal ? '…' : 'Log'}
+            </button>
+            <button className={styles.actionBtn} onClick={() => { setSelectedIng(null); setMealAmount('') }}>×</button>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.replacePanel}>
+          <input className={styles.searchInput} type="text" placeholder="Search food…"
+            value={mealQuery} onChange={e => setMealQuery(e.target.value)} />
+          {mealSearching && <p className={styles.searchHint}>Searching…</p>}
+          {!mealSearching && mealResults.length > 0 && (
+            <div className={styles.searchResults}>
+              {mealResults.slice(0, 5).map(r => (
+                <button key={r.id} className={styles.searchResult}
+                  onClick={() => { setSelectedIng(r); setMealQuery(''); setMealResults([]) }}>
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.header}>
-        <p className={styles.summary}>{data.summary}</p>
-        {onFocusRequest && (
-          <button className={styles.focusBtn} onClick={onFocusRequest}>focus →</button>
-        )}
-      </div>
-      <div className={styles.metricGrid}>
-        {data.metrics.map(m => (
-          <div key={m.label} className={styles.metricRow}>
-            <span className={styles.metricLabel}>{m.label}</span>
-            <span className={styles.metricValue}>{m.value}</span>
-          </div>
-        ))}
-      </div>
+    <div className={styles.cardContainer}>
+      <SwipeableCard home={overviewPanel} pages={[loggedPanel, mealsPanel]} />
     </div>
   )
 }
