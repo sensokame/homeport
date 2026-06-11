@@ -237,3 +237,552 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* ── Venue picker ──────────────────────────── */
+
+.venuePrompt {
+  font-size: var(--text-base);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.venuePicker {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.venueBtn {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.venueBtn:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+/* ── Day header + picker ───────────────────── */
+
+.dayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.switchDayBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+
+.switchDayBtn:hover {
+  color: var(--color-link);
+}
+
+.dayPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dayOption {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.dayOption:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+.dayOptionActive {
+  background: none;
+  border: 1px solid var(--color-link);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-link);
+  cursor: pointer;
+  text-align: left;
+}
+
+/* ── Exercise secondary actions ────────────── */
+
+.exerciseBlockSkipped {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-3);
+  gap: var(--space-2);
+  opacity: 0.4;
+}
+
+.exNameSkipped {
+  font-size: var(--text-base);
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.exTags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replacedTag {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.exerciseSecondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: color 0.15s;
+}
+
+.actionBtn:hover {
+  color: var(--color-link);
+}
+
+.actionDivider {
+  font-size: var(--text-xs);
+  color: var(--color-border);
+  user-select: none;
+}
+
+/* ── Replace search ────────────────────────── */
+
+.replacePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.searchInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+
+.searchHint {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.searchResults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.searchResult {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.searchResult:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+/* ── SwipeableCard focus container ─────────────── */
+
+.swipeableContainer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Override SwipeableCard's max-height: 360px in focus mode */
+.swipeableContainer > div {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Panel content shared ──────────────────────── */
+
+.panelContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.panelTitle {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Overview panel ────────────────────────────── */
+
+.overviewSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.overviewSection:last-child {
+  border-bottom: none;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionLabel {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.05em;
+}
+
+.weightMain {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.weightValue {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.weightUp {
+  font-size: var(--text-sm);
+  color: var(--color-warn);
+}
+
+.weightDown {
+  font-size: var(--text-sm);
+  color: var(--color-ok);
+}
+
+.weightHistory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.weightHistoryItem {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.scheduleInfo {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.recordsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recordRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.recordRow:last-child {
+  border-bottom: none;
+}
+
+.recordName {
+  color: var(--color-muted);
+}
+
+.recordValue {
+  color: var(--color-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Meals panel ───────────────────────────────── */
+
+.diaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.diaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diaryRow:last-child {
+  border-bottom: none;
+}
+
+.diaryName {
+  color: var(--color-text);
+}
+
+.diaryAmount {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mealForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.selectedIngName {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+/* ── Explain panel ─────────────────────────────── */
+
+.explainPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.explainDescription {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.explainDescription p {
+  margin: 0;
+}
+
+.explainMeta {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.explainMeta strong {
+  color: var(--color-text);
+}
+
+/* ── Meals panel extras ────────────────────────── */
+
+.mealsPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.macroGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.macroCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.macroLabel {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.macroValue {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.macroUnit {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-left: 1px;
+}
+
+.macroGoal {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.goalEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.goalGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.goalField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.goalLabel {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.goalField .logInput {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.diaryEntry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diaryEntry:last-child {
+  border-bottom: none;
+}
+
+.diaryActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.diaryAmountBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s;
+}
+
+.diaryAmountBtn:hover {
+  color: var(--color-link);
+}
+
+.diaryAmountInput {
+  width: 56px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-link);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  text-align: center;
+}
+
+.diaryAmountInput:focus {
+  outline: none;
+}
+
+.diaryMacros {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
