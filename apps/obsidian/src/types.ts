@@ -16,7 +16,13 @@ export interface WritingProject {
   locations: number
   events: number
   chapters: number
+  word_count: number
   recent_activity: number
+}
+
+export interface Chapter {
+  stem: string
+  word_count: number
 }
 
 export interface JournalResponse {

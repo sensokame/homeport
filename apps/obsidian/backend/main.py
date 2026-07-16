@@ -9,10 +9,14 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import frontmatter
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from io import BytesIO
+
+import markdown as md_parser
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from weasyprint import HTML
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
 GOODREADS_USER_ID = os.getenv("GOODREADS_USER_ID", "")
@@ -274,6 +278,69 @@ def health():
 
 # ── Writing ──────────────────────────────────────────────────────────────────
 
+_CONTENT_FOLDERS = ("book", "stories", "draft")
+
+_PDF_CSS = """
+@page {
+    size: A4;
+    margin: 2.5cm 3cm;
+    @bottom-center {
+        content: counter(page);
+        font-family: 'Liberation Serif', Georgia, serif;
+        font-size: 9pt;
+        color: #888;
+    }
+}
+body {
+    font-family: 'Liberation Serif', Georgia, 'Times New Roman', serif;
+    font-size: 11.5pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+}
+.project-name {
+    text-align: center;
+    font-size: 9pt;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #888;
+    margin: 0 0 6pt 0;
+    text-indent: 0;
+}
+h1 {
+    font-size: 17pt;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 28pt 0;
+}
+h2 { font-size: 13pt; margin-top: 20pt; margin-bottom: 8pt; }
+p {
+    margin: 0 0 10pt 0;
+    text-align: left;
+    text-indent: 1.2em;
+    orphans: 2;
+    widows: 2;
+}
+p:first-of-type, h1 + p, h2 + p { text-indent: 0; }
+em { font-style: italic; }
+strong { font-weight: 700; }
+blockquote {
+    border-left: 2px solid #bbb;
+    margin: 16pt 0;
+    padding-left: 14pt;
+    color: #555;
+    font-style: italic;
+}
+hr {
+    border: none;
+    text-align: center;
+    margin: 22pt 0;
+    break-before: avoid;
+    break-after: avoid;
+}
+hr::before { content: '\\2022 \\2022 \\2022'; letter-spacing: 0.5em; color: #999; }
+"""
+
+
 def _writing_project_path(name: str) -> Path:
     return WRITING_PATH / name
 
@@ -282,6 +349,53 @@ def _list_md_stems(folder: Path) -> list[str]:
     if not folder.exists():
         return []
     return sorted(f.stem for f in folder.glob("*.md") if f.is_file())
+
+
+_FRONTMATTER_RE = re.compile(r"^---[\s\S]*?---\n?")
+_FENCED_CODE_RE = re.compile(r"```[\s\S]*?```")
+_INLINE_CODE_RE = re.compile(r"`[^`]*`")
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_LINK_RE = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+_HEADING_RE = re.compile(r"^#{1,6}\s+", re.MULTILINE)
+_EMPHASIS_RE = re.compile(r"[*_~]{1,3}([^*_~]+)[*_~]{1,3}")
+_LIST_RE = re.compile(r"^\s*[-*+>|]\s*", re.MULTILINE)
+_ORDERED_LIST_RE = re.compile(r"^\s*\d+\.\s+", re.MULTILINE)
+
+
+def _word_count(text: str) -> int:
+    t = _FRONTMATTER_RE.sub("", text)
+    t = _FENCED_CODE_RE.sub("", t)
+    t = _INLINE_CODE_RE.sub("", t)
+    t = _HTML_TAG_RE.sub("", t)
+    t = _LINK_RE.sub(r"\1", t)
+    t = _HEADING_RE.sub("", t)
+    t = _EMPHASIS_RE.sub(r"\1", t)
+    t = _LIST_RE.sub("", t)
+    t = _ORDERED_LIST_RE.sub("", t)
+    return len(t.split())
+
+
+def _content_files(project_name: str) -> list[Path]:
+    base = _writing_project_path(project_name)
+    for folder_name in _CONTENT_FOLDERS:
+        folder = base / folder_name
+        files = sorted(folder.glob("*.md")) if folder.exists() else []
+        if files:
+            return files
+    return []
+
+
+def _content_stems(project_name: str) -> list[str]:
+    return [f.stem for f in _content_files(project_name)]
+
+
+def _find_chapter_file(project_name: str, stem: str) -> Path | None:
+    base = _writing_project_path(project_name)
+    for folder_name in _CONTENT_FOLDERS:
+        f = base / folder_name / f"{stem}.md"
+        if f.exists():
+            return f
+    return None
 
 
 def _recent_activity(path: Path, days: int = 7) -> int:
@@ -321,14 +435,16 @@ def create_project(body: ProjectRequest):
 def get_project(name: str):
     base = _writing_project_path(name)
     if not base.exists():
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Project not found")
+    chapter_files = _content_files(name)
+    word_count = sum(_word_count(f.read_text()) for f in chapter_files)
     return {
         "name": name,
         "characters": len(_list_md_stems(base / "characters")),
         "locations": len(_list_md_stems(base / "locations")),
         "events": len(_list_md_stems(base / "events")),
-        "chapters": len(_list_md_stems(base / "book")),
+        "chapters": len(chapter_files),
+        "word_count": word_count,
         "recent_activity": _recent_activity(base),
     }
 
@@ -354,7 +470,10 @@ def create_character(name: str, body: CharacterRequest):
 
 @app.get("/api/writing/projects/{name}/chapters")
 def list_chapters(name: str):
-    return _list_md_stems(_writing_project_path(name) / "book")
+    return [
+        {"stem": f.stem, "word_count": _word_count(f.read_text())}
+        for f in _content_files(name)
+    ]
 
 
 class ChapterRequest(BaseModel):
@@ -369,6 +488,33 @@ def create_chapter(name: str, body: ChapterRequest):
     if not filepath.exists():
         filepath.write_text(f"# {body.title}\n\n")
     return {"title": body.title, "created": not filepath.exists()}
+
+
+@app.get("/api/writing/projects/{name}/chapters/{chapter}")
+def get_chapter(name: str, chapter: str):
+    f = _find_chapter_file(name, chapter)
+    if not f:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    return {"content": f.read_text()}
+
+
+@app.get("/api/writing/projects/{name}/chapters/{chapter}/export.pdf")
+def export_chapter_pdf(name: str, chapter: str):
+    f = _find_chapter_file(name, chapter)
+    if not f:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    html_body = md_parser.markdown(f.read_text(), extensions=["extra", "smarty"])
+    project_label = name.replace("-", " ").replace("_", " ").title()
+    kicker = f'<p class="project-name">{project_label}</p>'
+    html = f"<html><head><style>{_PDF_CSS}</style></head><body>{kicker}{html_body}</body></html>"
+    buf = BytesIO()
+    HTML(string=html).write_pdf(target=buf)
+    filename = f"{chapter}.pdf"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Journal ──────────────────────────────────────────────────────────────────

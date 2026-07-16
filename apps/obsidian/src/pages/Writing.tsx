@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchProjects, fetchProject, fetchCharacters, createCharacter, fetchChapters, createChapter, createProject } from '../api'
-import type { WritingProject } from '../types'
+import { marked } from 'marked'
+import { fetchProjects, fetchProject, fetchCharacters, createCharacter, fetchChapters, fetchChapterContent, chapterExportUrl, createChapter, createProject } from '../api'
+import type { WritingProject, Chapter } from '../types'
 import styles from './Writing.module.css'
 
 type Tab = 'overview' | 'characters' | 'chapters'
@@ -57,12 +58,67 @@ function CreateDialog({ title, placeholder, onConfirm, onClose }: {
   )
 }
 
+function chapterDisplayName(stem: string): string {
+  return stem.replace(/^\d+-/, '').replace(/-/g, ' ')
+}
+
+function countWords(markdown: string): number {
+  const noFrontmatter = markdown.replace(/^---[\s\S]*?---\n?/, '')
+  const noCode = noFrontmatter.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '')
+  const noHtml = noCode.replace(/<[^>]+>/g, '')
+  const noLinks = noHtml.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+  const noMarkdown = noLinks
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+    .replace(/^\s*[-*+>|]\s*/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+  return noMarkdown.trim().split(/\s+/).filter(Boolean).length
+}
+
+function ChapterReader({ project, chapter, onBack }: { project: string; chapter: string; onBack: () => void }) {
+  const [html, setHtml] = useState('')
+  const [wordCount, setWordCount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchChapterContent(project, chapter)
+      .then(content => {
+        setHtml(marked.parse(content) as string)
+        setWordCount(countWords(content))
+      })
+      .finally(() => setLoading(false))
+  }, [project, chapter])
+
+  return (
+    <div>
+      <div className={styles.readerHeader}>
+        <button className={styles.backBtn} onClick={onBack}>← Back</button>
+        <span className={styles.readerWordCount}>
+          {wordCount !== null ? `${wordCount.toLocaleString()} words` : ''}
+        </span>
+        <a
+          className={styles.exportBtn}
+          href={chapterExportUrl(project, chapter)}
+          download
+        >
+          Export PDF
+        </a>
+      </div>
+      {loading
+        ? <p className={styles.muted}>Loading…</p>
+        : <div className={styles.prose} dangerouslySetInnerHTML={{ __html: html }} />
+      }
+    </div>
+  )
+}
+
 function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
   const [tab, setTab] = useState<Tab>('overview')
   const [project, setProject] = useState<WritingProject | null>(null)
   const [characters, setCharacters] = useState<string[]>([])
-  const [chapters, setChapters] = useState<string[]>([])
+  const [chapters, setChapters] = useState<Chapter[]>([])
   const [dialog, setDialog] = useState<'character' | 'chapter' | null>(null)
+  const [selectedChapter, setSelectedChapter] = useState<string | null>(null)
 
   useEffect(() => { fetchProject(name).then(setProject) }, [name])
 
@@ -81,6 +137,10 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
     await createChapter(name, title)
     fetchChapters(name).then(setChapters)
     fetchProject(name).then(setProject)
+  }
+
+  if (selectedChapter) {
+    return <ChapterReader project={name} chapter={selectedChapter} onBack={() => setSelectedChapter(null)} />
   }
 
   const displayName = name.replace(/-/g, ' ')
@@ -130,11 +190,12 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
       {tab === 'overview' && project && (
         <div className={styles.overviewGrid}>
           {[
-            { label: 'Characters', value: project.characters },
-            { label: 'Chapters', value: project.chapters },
-            { label: 'Locations', value: project.locations },
-            { label: 'Events', value: project.events },
-            { label: 'Active (7d)', value: project.recent_activity },
+            { label: 'Characters', value: project.characters.toString() },
+            { label: 'Chapters', value: project.chapters.toString() },
+            { label: 'Words', value: project.word_count.toLocaleString() },
+            { label: 'Locations', value: project.locations.toString() },
+            { label: 'Events', value: project.events.toString() },
+            { label: 'Active (7d)', value: project.recent_activity.toString() },
           ].map(s => (
             <div key={s.label} className={styles.overviewCard}>
               <div className={styles.overviewValue}>{s.value}</div>
@@ -162,9 +223,12 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
           : (
             <div className={styles.itemList}>
               {chapters.map((c, i) => (
-                <div key={c} className={styles.item}>
-                  <span>Chapter {i + 1} — {c}</span>
-                </div>
+                <button key={c.stem} className={styles.chapterItem} onClick={() => setSelectedChapter(c.stem)}>
+                  <span className={styles.chapterIndex}>{i + 1}</span>
+                  <span className={styles.chapterTitle}>{chapterDisplayName(c.stem)}</span>
+                  <span className={styles.chapterWordCount}>{c.word_count.toLocaleString()} w</span>
+                  <span className={styles.chapterArrow}>→</span>
+                </button>
               ))}
             </div>
           )
