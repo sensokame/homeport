@@ -2,14 +2,10 @@ import { lazy } from 'react'
 import type { WidgetManifest } from '@homeport/ui'
 import { ClockWidget } from '../widgets/builtin/ClockWidget'
 
-const TaskOverviewWidget     = lazy(() => import('vikunja/TaskOverviewWidget'))
-const ProjectFocusWidget     = lazy(() => import('vikunja/ProjectFocusWidget'))
-const BudgetWidget           = lazy(() => import('budget/BudgetWidget'))
 const CalendarWidget         = lazy(() => import('gcal/CalendarWidget'))
 const InfraWidget            = lazy(() => import('infra/InfraWidget'))
 const InventoryOverviewWidget = lazy(() => import('inventory/InventoryOverviewWidget'))
 const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
-const FitnessWidget          = lazy(() => import('wger/FitnessWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
   'builtin.clock': {
@@ -36,24 +32,6 @@ export const registry: Record<string, WidgetManifest> = {
     component: InventoryOverviewWidget,
     defaultIcon: 'package',
   },
-  'vikunja.task-overview': {
-    id: 'vikunja.task-overview',
-    name: 'Tasks',
-    description: 'All open tasks with per-project pages; highlights overdue and blocked items',
-    configSchema: {},
-    component: TaskOverviewWidget,
-    defaultIcon: 'check-square',
-  },
-  'vikunja.project-focus': {
-    id: 'vikunja.project-focus',
-    name: 'Project Focus',
-    description: 'Tasks for a single project',
-    configSchema: {
-      project_id: { type: 'number', label: 'Project ID', required: true },
-    },
-    component: ProjectFocusWidget,
-    defaultIcon: 'folder',
-  },
   'infra.overview': {
     id: 'infra.overview',
     name: 'Infrastructure',
@@ -61,22 +39,6 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: InfraWidget,
     defaultIcon: 'server',
-  },
-  'fitness.overview': {
-    id: 'fitness.overview',
-    name: 'Fitness',
-    description: "Today's workout status, active routine, and nutrition log count",
-    configSchema: {},
-    component: FitnessWidget,
-    defaultIcon: 'activity',
-  },
-  'budget.overview': {
-    id: 'budget.overview',
-    name: 'Budget',
-    description: 'Current month budget summary — spent vs remaining',
-    configSchema: {},
-    component: BudgetWidget,
-    defaultIcon: 'dollar-sign',
   },
   'calendar.overview': {
     id: 'calendar.overview',

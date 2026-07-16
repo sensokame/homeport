@@ -17,24 +17,9 @@
       "widgetUrl": "http://inventory:8080"
     },
     {
-      "id": "vikunja",
-      "url": "http://vikunja.station",
-      "widgetUrl": "http://vikunja-sat:8080"
-    },
-    {
-      "id": "wger",
-      "url": "http://wger.station",
-      "widgetUrl": "http://wger-sat:8080"
-    },
-    {
       "id": "knowledge",
       "url": "http://knowledge.station",
       "widgetUrl": "http://knowledge:8080"
-    },
-    {
-      "id": "budget",
-      "url": "http://budget.station",
-      "widgetUrl": "http://actual-sat:8080"
     }
   ],
   "tabs": [
@@ -80,26 +65,6 @@
           "config": {
             "icon": "package"
           }
-        },
-        {
-          "instanceId": "vikunja-main",
-          "widgetId": "vikunja.task-overview",
-          "satelliteId": "vikunja",
-          "config": {
-            "icon": "check-square"
-          }
-        },
-        {
-          "instanceId": "wger-main",
-          "widgetId": "fitness.overview",
-          "satelliteId": "wger",
-          "config": {}
-        },
-        {
-          "instanceId": "budget-main",
-          "widgetId": "budget.overview",
-          "satelliteId": "budget",
-          "config": {}
         }
       ]
     }
