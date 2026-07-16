@@ -17,6 +17,11 @@ interface WidgetData {
   next: CalEvent | null
 }
 
+interface FocusData {
+  fields: Record<string, string[]>
+  today: string | null
+}
+
 function timeRemaining(endIso: string): string {
   const diff = new Date(endIso).getTime() - Date.now()
   if (diff <= 0) return 'done'
@@ -34,16 +39,20 @@ function blockProgress(startIso: string, endIso: string): number {
 
 export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequest, isFocused }: WidgetProps) {
   const [data, setData] = useState<WidgetData | null>(null)
+  const [focus, setFocus] = useState<FocusData>({ fields: {}, today: null })
   const [loading, setLoading] = useState(true)
   const [traded, setTraded] = useState(false)
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
-    fetch(`${satelliteUrl}/widget`)
-      .then(r => r.json())
-      .then((d: WidgetData) => {
+    Promise.all([
+      fetch(`${satelliteUrl}/widget`).then(r => r.json()),
+      fetch(`${satelliteUrl}/api/focus`).then(r => r.json()),
+    ])
+      .then(([d, f]: [WidgetData, FocusData]) => {
         setData(d)
         setTraded(d.current?.traded ?? false)
+        setFocus(f)
         onStatusChange?.(d.configured ? 'ok' : 'warn')
       })
       .catch(() => onStatusChange?.('error'))
@@ -79,6 +88,7 @@ export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequ
   if (isFocused && data.current) {
     const remaining = timeRemaining(data.current.end)
     const progress = blockProgress(data.current.start, data.current.end)
+    const focusFields = Object.entries(focus.fields)
     return (
       <div className={styles.focusedPanel}>
         <div className={styles.focusedBlock}>
@@ -89,6 +99,22 @@ export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequ
             <div className={styles.progressFill} style={{ width: `${progress}%` }} />
           </div>
           <p className={styles.remaining}>{remaining} {remaining !== 'done' ? 'remaining' : ''}</p>
+          {(focusFields.length > 0 || focus.today) && (
+            <div className={styles.focusedFields}>
+              {focusFields.map(([key, values]) => (
+                <div key={key} className={styles.focusedField}>
+                  <span className={styles.focusedFieldKey}>{key}</span>
+                  <span className={styles.focusedFieldVal}>{values.join(', ')}</span>
+                </div>
+              ))}
+              {focus.today && (
+                <div className={styles.focusedField}>
+                  <span className={styles.focusedFieldKey}>today</span>
+                  <span className={styles.focusedFieldVal}>{focus.today}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -96,6 +122,15 @@ export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequ
 
   return (
     <div className={styles.panel}>
+      {(focus.fields.project?.length || focus.today) && (
+        <div className={styles.section}>
+          <span className={styles.label}>focus</span>
+          {focus.fields.project?.map(p => (
+            <p key={p} className={styles.focusProject}>{p}</p>
+          ))}
+          {focus.today && <p className={styles.focusNote}>{focus.today}</p>}
+        </div>
+      )}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.label}>now</span>

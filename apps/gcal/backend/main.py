@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -16,9 +17,53 @@ STATIC_DIR = Path(__file__).parent / "static"
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 TRADES_FILE = DATA_DIR / "trades.json"
 GCAL_ICS_URL = os.getenv("GCAL_ICS_URL", "")
+FOCUS_FILE = Path(os.getenv("FOCUS_FILE", "")) if os.getenv("FOCUS_FILE") else None
 TZ = ZoneInfo("Europe/Berlin")
 
 app = FastAPI()
+
+
+def _parse_focus() -> dict:
+    if not FOCUS_FILE or not FOCUS_FILE.exists():
+        return {"fields": {}, "today": None}
+
+    lines = FOCUS_FILE.read_text().splitlines()
+
+    # Isolate the ## Focus section
+    in_focus = False
+    focus_lines: list[str] = []
+    for line in lines:
+        if re.match(r"^## Focus\b", line):
+            in_focus = True
+            continue
+        if in_focus and re.match(r"^## ", line):
+            break
+        if in_focus:
+            focus_lines.append(line)
+
+    # Collect all key: value lines into lists
+    fields: dict[str, list[str]] = {}
+    for line in focus_lines:
+        m = re.match(r"^(\w+):\s*(.+)", line)
+        if m:
+            key, val = m.group(1), m.group(2).strip()
+            if val:
+                fields.setdefault(key, []).append(val)
+
+    # Extract today's dated note
+    today_str = date.today().isoformat()
+    today_lines: list[str] = []
+    in_today = False
+    for line in focus_lines:
+        if re.match(rf"^### {re.escape(today_str)}", line):
+            in_today = True
+            continue
+        if in_today and re.match(r"^### ", line):
+            break
+        if in_today and line.strip():
+            today_lines.append(line.strip())
+
+    return {"fields": fields, "today": " ".join(today_lines) or None}
 
 
 def _load_trades() -> dict:
@@ -77,6 +122,13 @@ def catalog():
          "description": "Current calendar block with one-click trade acknowledgment",
          "configSchema": {}},
     ]}
+
+
+# ── Focus ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/focus")
+def focus():
+    return _parse_focus()
 
 
 # ── Status ────────────────────────────────────────────────────────────────────
