@@ -112,15 +112,29 @@ function ChapterReader({ project, chapter, onBack }: { project: string; chapter:
   )
 }
 
-function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
+function ProjectDetail({ name, initialChapter, onBack }: { name: string; initialChapter?: string | null; onBack: () => void }) {
   const [tab, setTab] = useState<Tab>('overview')
   const [project, setProject] = useState<WritingProject | null>(null)
   const [characters, setCharacters] = useState<string[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [dialog, setDialog] = useState<'character' | 'chapter' | null>(null)
-  const [selectedChapter, setSelectedChapter] = useState<string | null>(null)
+  const [selectedChapter, setSelectedChapter] = useState<string | null>(initialChapter ?? null)
 
   useEffect(() => { fetchProject(name).then(setProject) }, [name])
+
+  useEffect(() => {
+    if (initialChapter) {
+      setSelectedChapter(initialChapter)
+      setTab('chapters')
+    }
+  }, [name, initialChapter])
+
+  function selectChapter(stem: string | null) {
+    setSelectedChapter(stem)
+    window.location.hash = stem
+      ? `#/writing/${encodeURIComponent(name)}/${encodeURIComponent(stem)}`
+      : `#/writing/${encodeURIComponent(name)}`
+  }
 
   useEffect(() => {
     if (tab === 'characters') fetchCharacters(name).then(setCharacters)
@@ -140,7 +154,7 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
   }
 
   if (selectedChapter) {
-    return <ChapterReader project={name} chapter={selectedChapter} onBack={() => setSelectedChapter(null)} />
+    return <ChapterReader project={name} chapter={selectedChapter} onBack={() => selectChapter(null)} />
   }
 
   const displayName = name.replace(/-/g, ' ')
@@ -223,7 +237,7 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
           : (
             <div className={styles.itemList}>
               {chapters.map((c, i) => (
-                <button key={c.stem} className={styles.chapterItem} onClick={() => setSelectedChapter(c.stem)}>
+                <button key={c.stem} className={styles.chapterItem} onClick={() => selectChapter(c.stem)}>
                   <span className={styles.chapterIndex}>{i + 1}</span>
                   <span className={styles.chapterTitle}>{chapterDisplayName(c.stem)}</span>
                   <span className={styles.chapterWordCount}>{c.word_count.toLocaleString()} w</span>
@@ -237,9 +251,9 @@ function ProjectDetail({ name, onBack }: { name: string; onBack: () => void }) {
   )
 }
 
-export default function Writing() {
+export default function Writing({ initialProject, initialChapter }: { initialProject?: string | null; initialChapter?: string | null }) {
   const [projects, setProjects] = useState<string[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialProject ?? null)
   const [stats, setStats] = useState<Record<string, WritingProject>>({})
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -255,14 +269,23 @@ export default function Writing() {
     loadProjects().finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (initialProject) setSelected(initialProject)
+  }, [initialProject])
+
   async function handleCreateProject(name: string) {
     const result = await createProject(name)
     await loadProjects()
     setSelected(result.name)
   }
 
+  function selectProject(name: string | null) {
+    setSelected(name)
+    window.location.hash = name ? `#/writing/${encodeURIComponent(name)}` : '#/writing'
+  }
+
   if (selected) {
-    return <ProjectDetail name={selected} onBack={() => setSelected(null)} />
+    return <ProjectDetail name={selected} initialChapter={initialChapter} onBack={() => selectProject(null)} />
   }
 
   if (loading) return <p className={styles.muted}>Loading…</p>
@@ -285,7 +308,7 @@ export default function Writing() {
         {projects.map(p => {
           const s = stats[p]
           return (
-            <button key={p} className={styles.projectCard} onClick={() => setSelected(p)}>
+            <button key={p} className={styles.projectCard} onClick={() => selectProject(p)}>
               <div className={styles.projectName}>{p.replace(/-/g, ' ')}</div>
               {s && (
                 <div className={styles.projectStats}>

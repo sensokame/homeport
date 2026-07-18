@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone, timedelta
 from email.utils import parsedate
 from pathlib import Path
-from typing import Literal
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -293,6 +292,7 @@ def health():
 # ── Writing ──────────────────────────────────────────────────────────────────
 
 _CONTENT_FOLDERS = ("book", "stories", "draft")
+_COLLECTION_FOLDER = "entries"
 
 _PDF_CSS = """
 @page {
@@ -389,14 +389,51 @@ def _word_count(text: str) -> int:
     return len(t.split())
 
 
-def _content_files(project_name: str) -> list[Path]:
+_DEFAULT_STATUS_VALUES = ["draft", "revision", "final"]
+_PROJECT_STATUS_VALUES = ["draft", "in-progress", "on-hold", "ongoing", "complete"]
+
+
+def _project_notes_path(project_name: str) -> Path:
+    return _writing_project_path(project_name) / "notes.md"
+
+
+def _heuristic_content_path(project_name: str) -> str | None:
+    """Folder-order guess, used only when a project hasn't declared
+    content_path in its notes.md frontmatter. Kept only as a fallback for
+    projects with no declaration yet — see [[reference_writing_vault_schema]]."""
     base = _writing_project_path(project_name)
     for folder_name in _CONTENT_FOLDERS:
-        folder = base / folder_name
-        files = sorted(folder.glob("*.md")) if folder.exists() else []
-        if files:
-            return files
-    return []
+        if (base / folder_name).exists() and any((base / folder_name).glob("*.md")):
+            return folder_name
+    if (base / _COLLECTION_FOLDER).exists():
+        return _COLLECTION_FOLDER
+    return None
+
+
+def _project_config(project_name: str) -> dict:
+    """Reads content_path / shape / status_values from the project's own
+    notes.md frontmatter — the source of truth for how a project is laid
+    out, rather than inferring it by guessing which folder has files. Falls
+    back to the folder heuristic only when nothing is declared, so existing
+    projects keep working until their notes.md is updated."""
+    notes_path = _project_notes_path(project_name)
+    declared: dict = {}
+    if notes_path.exists():
+        declared = frontmatter.loads(notes_path.read_text()).metadata or {}
+    content_path = declared.get("content_path") or _heuristic_content_path(project_name)
+    shape = declared.get("shape") or (
+        "collection" if content_path == _COLLECTION_FOLDER else "manuscript"
+    )
+    status_values = declared.get("status_values") or _DEFAULT_STATUS_VALUES
+    return {"content_path": content_path, "shape": shape, "status_values": status_values}
+
+
+def _content_files(project_name: str) -> list[Path]:
+    content_path = _project_config(project_name)["content_path"]
+    if not content_path:
+        return []
+    folder = _writing_project_path(project_name) / content_path
+    return sorted(folder.glob("*.md")) if folder.exists() else []
 
 
 def _content_stems(project_name: str) -> list[str]:
@@ -404,12 +441,11 @@ def _content_stems(project_name: str) -> list[str]:
 
 
 def _find_chapter_file(project_name: str, stem: str) -> Path | None:
-    base = _writing_project_path(project_name)
-    for folder_name in _CONTENT_FOLDERS:
-        f = base / folder_name / f"{stem}.md"
-        if f.exists():
-            return f
-    return None
+    content_path = _project_config(project_name)["content_path"]
+    if not content_path:
+        return None
+    f = _writing_project_path(project_name) / content_path / f"{stem}.md"
+    return f if f.exists() else None
 
 
 def _recent_activity(path: Path, days: int = 7) -> int:
@@ -429,8 +465,10 @@ def _writing_meta_path(name: str) -> Path:
 def _load_writing_meta(name: str) -> dict:
     p = _writing_meta_path(name)
     if not p.exists():
-        return {"chapter_status": {}, "sessions": [], "open_session": None}
-    return json.loads(p.read_text())
+        return {"chapter_status": {}, "sessions": [], "open_session": None, "project_status": None}
+    meta = json.loads(p.read_text())
+    meta.setdefault("project_status", None)
+    return meta
 
 
 def _save_writing_meta(name: str, meta: dict) -> None:
@@ -481,14 +519,19 @@ def get_project(name: str):
     base = _writing_project_path(name)
     if not base.exists():
         raise HTTPException(status_code=404, detail="Project not found")
+    config = _project_config(name)
     chapter_files = _content_files(name)
     word_count = sum(_word_count(f.read_text()) for f in chapter_files)
     meta = _load_writing_meta(name)
-    status_counts = {"draft": 0, "revision": 0, "final": 0}
+    status_counts = {v: 0 for v in config["status_values"]}
     for f in chapter_files:
-        status_counts[meta["chapter_status"].get(f.stem, "draft")] += 1
+        status_counts[meta["chapter_status"].get(f.stem, config["status_values"][0])] += 1
     return {
         "name": name,
+        "shape": config["shape"],
+        "status_values": config["status_values"],
+        "project_status": meta["project_status"] or _PROJECT_STATUS_VALUES[0],
+        "project_status_values": _PROJECT_STATUS_VALUES,
         "characters": len(_list_md_stems(base / "characters")),
         "locations": len(_list_md_stems(base / "locations")),
         "events": len(_list_md_stems(base / "events")),
@@ -522,11 +565,12 @@ def create_character(name: str, body: CharacterRequest):
 @app.get("/api/writing/projects/{name}/chapters")
 def list_chapters(name: str):
     meta = _load_writing_meta(name)
+    default_status = _project_config(name)["status_values"][0]
     return [
         {
             "stem": f.stem,
             "word_count": _word_count(f.read_text()),
-            "status": meta["chapter_status"].get(f.stem, "draft"),
+            "status": meta["chapter_status"].get(f.stem, default_status),
         }
         for f in _content_files(name)
     ]
@@ -574,17 +618,36 @@ def export_chapter_pdf(name: str, chapter: str):
 
 
 class ChapterStatusRequest(BaseModel):
-    status: Literal["draft", "revision", "final"]
+    status: str
 
 
 @app.patch("/api/writing/projects/{name}/chapters/{chapter}/status")
 def set_chapter_status(name: str, chapter: str, body: ChapterStatusRequest):
     if not _find_chapter_file(name, chapter):
         raise HTTPException(status_code=404, detail="Chapter not found")
+    status_values = _project_config(name)["status_values"]
+    if body.status not in status_values:
+        raise HTTPException(status_code=422, detail=f"status must be one of {status_values}")
     meta = _load_writing_meta(name)
     meta["chapter_status"][chapter] = body.status
     _save_writing_meta(name, meta)
     return {"stem": chapter, "status": body.status}
+
+
+class ProjectStatusRequest(BaseModel):
+    status: str
+
+
+@app.patch("/api/writing/projects/{name}/status")
+def set_project_status(name: str, body: ProjectStatusRequest):
+    if not _writing_project_path(name).exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    if body.status not in _PROJECT_STATUS_VALUES:
+        raise HTTPException(status_code=422, detail=f"status must be one of {_PROJECT_STATUS_VALUES}")
+    meta = _load_writing_meta(name)
+    meta["project_status"] = body.status
+    _save_writing_meta(name, meta)
+    return {"name": name, "project_status": body.status}
 
 
 @app.post("/api/writing/projects/{name}/sessions/start")

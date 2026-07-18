@@ -9,16 +9,19 @@ import styles from './App.module.css'
 type Section = 'reading' | 'writing' | 'life'
 type Shelf = 'currently-reading' | 'read' | 'to-read'
 
-function parseHash(hash: string): { section: Section; shelf: Shelf } {
-  if (hash.startsWith('#/writing')) return { section: 'writing', shelf: 'currently-reading' }
-  if (hash.startsWith('#/life')) return { section: 'life', shelf: 'currently-reading' }
-  if (hash === '#/read') return { section: 'reading', shelf: 'read' }
-  if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read' }
-  return { section: 'reading', shelf: 'currently-reading' }
+function parseHash(hash: string): { section: Section; shelf: Shelf; writingProject: string | null; writingChapter: string | null } {
+  if (hash.startsWith('#/writing')) {
+    const [, , project, chapter] = hash.split('/').map(p => (p ? decodeURIComponent(p) : p))
+    return { section: 'writing', shelf: 'currently-reading', writingProject: project || null, writingChapter: chapter || null }
+  }
+  if (hash.startsWith('#/life')) return { section: 'life', shelf: 'currently-reading', writingProject: null, writingChapter: null }
+  if (hash === '#/read') return { section: 'reading', shelf: 'read', writingProject: null, writingChapter: null }
+  if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read', writingProject: null, writingChapter: null }
+  return { section: 'reading', shelf: 'currently-reading', writingProject: null, writingChapter: null }
 }
 
 export default function App() {
-  const [{ section, shelf }, setRoute] = useState(() => parseHash(window.location.hash))
+  const [{ section, shelf, writingProject, writingChapter }, setRoute] = useState(() => parseHash(window.location.hash))
 
   useEffect(() => {
     const handler = () => setRoute(parseHash(window.location.hash))
@@ -81,7 +84,7 @@ export default function App() {
         {section === 'reading' && shelf === 'currently-reading' && <Reading />}
         {section === 'reading' && shelf === 'read' && <Library shelf="read" />}
         {section === 'reading' && shelf === 'to-read' && <Library shelf="to-read" />}
-        {section === 'writing' && <Writing />}
+        {section === 'writing' && <Writing initialProject={writingProject} initialChapter={writingChapter} />}
         {section === 'life' && <Life />}
       </main>
     </div>

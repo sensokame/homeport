@@ -28,10 +28,23 @@
   gap: 2px;
 }
 
+.projectNameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .projectName {
   font-size: var(--text-sm);
   color: var(--color-text);
   text-transform: capitalize;
+}
+
+.projectStatusBadge {
+  font-size: var(--text-xs);
+  text-transform: capitalize;
+  flex-shrink: 0;
 }
 
 .projectMeta {
@@ -47,11 +60,23 @@
 
 /* ── Per-project page ── */
 
+.projectTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .projectTitle {
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
   text-transform: capitalize;
+  text-decoration: none;
+}
+
+.projectTitle:hover {
+  text-decoration: underline;
 }
 
 .chapterList {
@@ -70,9 +95,14 @@
 .chapterName {
   font-size: var(--text-sm);
   color: var(--color-text);
+  text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chapterName:hover {
+  text-decoration: underline;
 }
 
 .statusSelect {
@@ -95,6 +125,10 @@
 
 .statusFinal {
   color: var(--color-ok);
+}
+
+.statusNeutral {
+  color: var(--color-text);
 }
 
 .focusStartBtn {

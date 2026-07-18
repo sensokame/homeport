@@ -15,7 +15,7 @@ export interface ReadingData {
   total_read: number
 }
 
-export type ChapterStatus = 'draft' | 'revision' | 'final'
+export type ChapterStatus = string
 
 export interface WritingChapter {
   stem: string
@@ -37,8 +37,14 @@ export interface OpenWritingSession {
   word_count_start: number
 }
 
+export type ProjectShape = 'manuscript' | 'collection'
+
 export interface WritingProjectSummary {
   name: string
+  shape: ProjectShape
+  status_values: ChapterStatus[]
+  project_status: ChapterStatus
+  project_status_values: ChapterStatus[]
   characters: number
   locations: number
   events: number

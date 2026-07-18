@@ -6,20 +6,23 @@ import type {
 } from './types'
 import styles from './WritingWidget.module.css'
 
-const STATUS_LABEL: Record<ChapterStatus, string> = {
-  draft: 'draft', revision: 'revision', final: 'final',
-}
+const DEFAULT_STATUS_VALUES = ['draft', 'revision', 'final']
 
-function statusClass(status: ChapterStatus): string {
+function statusClass(status: ChapterStatus, statusValues: ChapterStatus[]): string {
+  // Only color-code the default draft/revision/final vocabulary — a custom
+  // vocabulary (e.g. 100-word-project's drafting/submitted/published/declined)
+  // can't be assumed to run from "least" to "most done" by position, so it
+  // gets a neutral style instead of a guessed-wrong one.
+  if (statusValues.join(',') !== DEFAULT_STATUS_VALUES.join(',')) return styles.statusNeutral
   if (status === 'final') return styles.statusFinal
   if (status === 'revision') return styles.statusRevision
   return styles.statusDraft
 }
 
-function statusSummary(counts: WritingProjectSummary['chapter_status_counts']): string {
-  return (['final', 'revision', 'draft'] as const)
-    .filter(k => counts[k] > 0)
-    .map(k => `${counts[k]} ${k}`)
+function statusSummary(counts: WritingProjectSummary['chapter_status_counts'], statusValues: ChapterStatus[]): string {
+  return statusValues
+    .filter(v => (counts[v] ?? 0) > 0)
+    .map(v => `${counts[v]} ${v}`)
     .join(' · ')
 }
 
@@ -43,12 +46,19 @@ function HomePanel({ projects }: { projects: WritingProjectSummary[] }) {
       <div className={styles.projectList}>
         {projects.map(p => (
           <div key={p.name} className={styles.projectRow}>
-            <div className={styles.projectName}>{p.name.replace(/-/g, ' ')}</div>
+            <div className={styles.projectNameRow}>
+              <span className={styles.projectName}>{p.name.replace(/-/g, ' ')}</span>
+              <span className={`${styles.projectStatusBadge} ${statusClass(p.project_status, p.project_status_values)}`}>
+                {p.project_status}
+              </span>
+            </div>
             <div className={styles.projectMeta}>
-              {p.word_count.toLocaleString()} words
+              {p.shape === 'collection'
+                ? `${p.chapters} ${p.chapters === 1 ? 'entry' : 'entries'}`
+                : `${p.word_count.toLocaleString()} words`}
               {p.current_streak_days > 0 && ` · ${p.current_streak_days}d streak`}
             </div>
-            <div className={styles.statusRow}>{statusSummary(p.chapter_status_counts)}</div>
+            <div className={styles.statusRow}>{statusSummary(p.chapter_status_counts, p.status_values)}</div>
           </div>
         ))}
       </div>
@@ -57,12 +67,14 @@ function HomePanel({ projects }: { projects: WritingProjectSummary[] }) {
 }
 
 function ProjectPanel({
-  project, chapters, satelliteUrl, onChaptersChanged, onFocusStart,
+  project, chapters, satelliteUrl, publicUrl, onChaptersChanged, onProjectChanged, onFocusStart,
 }: {
   project: WritingProjectSummary
   chapters: WritingChapter[]
   satelliteUrl: string
+  publicUrl: string
   onChaptersChanged: () => void
+  onProjectChanged: () => void
   onFocusStart?: (project: WritingProjectSummary) => void
 }) {
   async function setStatus(stem: string, status: ChapterStatus) {
@@ -74,21 +86,52 @@ function ProjectPanel({
     onChaptersChanged()
   }
 
+  async function setProjectStatus(status: ChapterStatus) {
+    await fetch(`${satelliteUrl}/api/writing/projects/${project.name}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    onProjectChanged()
+  }
+
+  const projectHref = `${publicUrl}/#/writing/${encodeURIComponent(project.name)}`
+
   return (
     <div className={styles.panel}>
-      <span className={styles.projectTitle}>{project.name.replace(/-/g, ' ')}</span>
+      <div className={styles.projectTitleRow}>
+        <a className={styles.projectTitle} href={projectHref} target="_blank" rel="noopener">
+          {project.name.replace(/-/g, ' ')}
+        </a>
+        <select
+          className={`${styles.statusSelect} ${statusClass(project.project_status, project.project_status_values)}`}
+          value={project.project_status}
+          onChange={e => setProjectStatus(e.target.value)}
+        >
+          {project.project_status_values.map(v => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+      </div>
       <div className={styles.chapterList}>
         {chapters.map(c => (
           <div key={c.stem} className={styles.chapterRow}>
-            <span className={styles.chapterName}>{c.stem}</span>
-            <select
-              className={`${styles.statusSelect} ${statusClass(c.status)}`}
-              value={c.status}
-              onChange={e => setStatus(c.stem, e.target.value as ChapterStatus)}
+            <a
+              className={styles.chapterName}
+              href={`${projectHref}/${encodeURIComponent(c.stem)}`}
+              target="_blank"
+              rel="noopener"
             >
-              <option value="draft">{STATUS_LABEL.draft}</option>
-              <option value="revision">{STATUS_LABEL.revision}</option>
-              <option value="final">{STATUS_LABEL.final}</option>
+              {c.stem}
+            </a>
+            <select
+              className={`${styles.statusSelect} ${statusClass(c.status, project.status_values)}`}
+              value={c.status}
+              onChange={e => setStatus(c.stem, e.target.value)}
+            >
+              {project.status_values.map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
             </select>
           </div>
         ))}
@@ -105,7 +148,7 @@ function ProjectPanel({
 
 type FocusStage = 'idle' | 'active' | 'done'
 
-export function WritingWidget({ satelliteUrl, onStatusChange, onFocusRequest, isFocused }: WidgetProps) {
+export function WritingWidget({ satelliteUrl, publicUrl, onStatusChange, onFocusRequest, isFocused }: WidgetProps) {
   const [projects, setProjects] = useState<WritingProjectSummary[] | null>(null)
   const [chaptersByProject, setChaptersByProject] = useState<Record<string, WritingChapter[]>>({})
   const [loading, setLoading] = useState(true)
@@ -246,7 +289,9 @@ export function WritingWidget({ satelliteUrl, onStatusChange, onFocusRequest, is
           project={p}
           chapters={chaptersByProject[p.name] || []}
           satelliteUrl={satelliteUrl}
+          publicUrl={publicUrl}
           onChaptersChanged={() => fetchChapters(p.name)}
+          onProjectChanged={fetchData}
           onFocusStart={onFocusRequest ? handleFocusStart : undefined}
         />
       ))}
