@@ -65,6 +65,11 @@ jobs:
       - name: Extract tag message
         id: tag_message
         run: |
+          # actions/checkout's local refs/tags/<tag> can end up as a lightweight
+          # ref pointing straight at the commit, even with fetch-depth: 0 — that
+          # loses the annotation and makes %(contents) fall back to the commit
+          # message. Force-fetch the actual tag ref to get the real tag object.
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
           {
             echo 'body<<EOF'
             git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)'
