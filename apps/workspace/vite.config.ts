@@ -7,11 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     federation({
-      name: 'inventory',
+      name: 'workspace',
       filename: 'remoteEntry.js',
       exposes: {
-        './InventoryOverviewWidget': './src/widgets/InventoryOverviewWidget.entry',
-        './ProjectItemsWidget': './src/widgets/ProjectItemsWidget.entry',
+        './WorkspacePanelWidget': './src/widgets/WorkspacePanelWidget.entry',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },
@@ -32,7 +31,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8000',
-      '/widget': 'http://localhost:8000',
     },
   },
 })

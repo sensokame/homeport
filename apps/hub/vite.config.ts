@@ -13,6 +13,7 @@ export default defineConfig({
         infra:     '/api/remote/infra/assets/remoteEntry.js',
         inventory: '/api/remote/inventory/assets/remoteEntry.js',
         knowledge: '/api/remote/knowledge/assets/remoteEntry.js',
+        workspace: '/api/remote/workspace/assets/remoteEntry.js',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },
@@ -47,6 +48,10 @@ export default defineConfig({
       '/api/remote/knowledge': {
         target: 'http://localhost:5179',
         rewrite: (path) => path.replace(/^\/api\/remote\/knowledge/, ''),
+      },
+      '/api/remote/workspace': {
+        target: 'http://localhost:5180',
+        rewrite: (path) => path.replace(/^\/api\/remote\/workspace/, ''),
       },
     },
   },

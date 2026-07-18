@@ -1,4 +1,4 @@
-import type { Item, Project, Assignment } from './types'
+import type { Item, ProjectSummary, ProjectItems, Assignment } from './types'
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const r = await fetch(`/api${path}`, opts)
@@ -23,13 +23,10 @@ export const updateItem = (id: string, data: Partial<Item>) => req<Item>(`/items
 export const deleteItem = (id: string) => req<void>(`/items/${id}`, { method: 'DELETE' })
 export const getShoppingList = () => req<Item[]>('/items/shopping-list')
 
-// Projects
-export const getProjects = () => req<Project[]>('/projects')
-export const createProject = (data: Partial<Project>) => req<Project>('/projects', jsonOpts('POST', data))
-export const getProject = (id: string) => req<Project>(`/projects/${id}`)
-export const updateProject = (id: string, data: Partial<Project>) => req<Project>(`/projects/${id}`, jsonOpts('PUT', data))
-export const deleteProject = (id: string) => req<void>(`/projects/${id}`, { method: 'DELETE' })
-export const createAssignment = (projectId: string, data: { item_id: string; quantity_reserved: number; notes: string }) =>
-  req<Assignment>(`/projects/${projectId}/assignments`, jsonOpts('POST', data))
-export const deleteAssignment = (projectId: string, assignmentId: string) =>
-  req<void>(`/projects/${projectId}/assignments/${assignmentId}`, { method: 'DELETE' })
+// Projects (identity lives in the vault — inventory only tracks assignments by slug)
+export const getProjectSlugs = () => req<ProjectSummary[]>('/projects')
+export const getProjectItems = (slug: string) => req<ProjectItems>(`/projects/${slug}/items`)
+export const createAssignment = (slug: string, data: { item_id: string; quantity_reserved: number; notes: string }) =>
+  req<Assignment>(`/projects/${slug}/assignments`, jsonOpts('POST', data))
+export const deleteAssignment = (slug: string, assignmentId: string) =>
+  req<void>(`/projects/${slug}/assignments/${assignmentId}`, { method: 'DELETE' })

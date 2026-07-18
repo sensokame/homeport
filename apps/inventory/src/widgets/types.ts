@@ -18,7 +18,6 @@ export interface IAssignment {
 }
 
 export interface IProject {
-  id: string
-  name: string
+  slug: string
   assignments: IAssignment[]
 }

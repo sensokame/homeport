@@ -89,6 +89,10 @@ export default function Inventory() {
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState<'add' | Item | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [highlightId] = useState<string | null>(() => {
+    const m = window.location.hash.match(/[?&]item=([^&]+)/)
+    return m ? decodeURIComponent(m[1]) : null
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -102,6 +106,11 @@ export default function Inventory() {
   }, [search, category, status])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!highlightId || loading) return
+    document.getElementById(`item-${highlightId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightId, loading, items])
 
   const categories = [...new Set(items.map(i => i.category).filter(Boolean))]
 
@@ -161,7 +170,7 @@ export default function Inventory() {
             </thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.id}>
+                <tr key={item.id} id={`item-${item.id}`} className={item.id === highlightId ? styles.highlighted : undefined}>
                   <td className={styles.nameCell}>
                     <span>{item.name}</span>
                     {item.notes && <span className={styles.notes}>{item.notes}</span>}

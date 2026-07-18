@@ -5,7 +5,10 @@ import { ClockWidget } from '../widgets/builtin/ClockWidget'
 const CalendarWidget         = lazy(() => import('gcal/CalendarWidget'))
 const InfraWidget            = lazy(() => import('infra/InfraWidget'))
 const InventoryOverviewWidget = lazy(() => import('inventory/InventoryOverviewWidget'))
+const InventoryProjectItemsWidget = lazy(() => import('inventory/ProjectItemsWidget'))
 const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
+const KnowledgeProjectTasksWidget = lazy(() => import('knowledge/ProjectTasksWidget'))
+const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
   'builtin.clock': {
@@ -31,6 +34,32 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: InventoryOverviewWidget,
     defaultIcon: 'package',
+  },
+  'inventory.project-items': {
+    id: 'inventory.project-items',
+    name: 'Project Items',
+    description: 'Items assigned to one project',
+    configSchema: { project_slug: { type: 'string', label: 'Project slug', required: true } },
+    component: InventoryProjectItemsWidget,
+    defaultIcon: 'package',
+  },
+  'knowledge.project-tasks': {
+    id: 'knowledge.project-tasks',
+    name: 'Project Tasks',
+    description: 'Open tasks and notes for one vault project',
+    configSchema: { project_slug: { type: 'string', label: 'Project slug', required: true } },
+    component: KnowledgeProjectTasksWidget,
+    defaultIcon: 'check-square',
+  },
+  'workspace.panel': {
+    id: 'workspace.panel',
+    name: 'Workspace',
+    description: 'Composes widgets from other satellites into one card',
+    configSchema: {
+      label: { type: 'string', label: 'Label', required: true },
+    },
+    component: WorkspacePanelWidget,
+    defaultIcon: 'folder',
   },
   'infra.overview': {
     id: 'infra.overview',

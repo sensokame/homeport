@@ -6,6 +6,10 @@ import styles from './InventoryOverviewWidget.module.css'
 
 const STATUS_ORDER = ['depleted', 'needed', 'low', 'ordered']
 
+function formatSlug(slug: string): string {
+  return slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+}
+
 function badgeVariant(status: string): 'error' | 'warn' | 'default' {
   if (status === 'depleted') return 'error'
   if (status === 'needed' || status === 'low') return 'warn'
@@ -64,7 +68,7 @@ function ProjectPanel({ project }: { project: IProject }) {
   return (
     <div className={styles.panel}>
       <div className={styles.projectMeta}>
-        <span className={styles.projectName}>{project.name}</span>
+        <span className={styles.projectName}>{formatSlug(project.slug)}</span>
         <span className={styles.projectCount}>{sorted.length} item{sorted.length !== 1 ? 's' : ''}</span>
       </div>
       <div className={styles.itemList}>
@@ -101,7 +105,7 @@ export function InventoryOverviewWidget({ satelliteUrl, onStatusChange }: Widget
   return (
     <SwipeableCard
       home={<HomePanel items={items} />}
-      pages={projects.map(p => <ProjectPanel key={p.id} project={p} />)}
+      pages={projects.map(p => <ProjectPanel key={p.slug} project={p} />)}
     />
   )
 }

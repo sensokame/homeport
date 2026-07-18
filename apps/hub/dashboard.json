@@ -20,6 +20,11 @@
       "id": "knowledge",
       "url": "http://knowledge.station",
       "widgetUrl": "http://knowledge:8080"
+    },
+    {
+      "id": "workspace",
+      "url": "",
+      "widgetUrl": "http://workspace-sat:8080"
     }
   ],
   "tabs": [
@@ -64,6 +69,17 @@
           "satelliteId": "inventory",
           "config": {
             "icon": "package"
+          }
+        },
+        {
+          "instanceId": "workspace-test-4wd",
+          "widgetId": "workspace.panel",
+          "satelliteId": "workspace",
+          "config": {
+            "icon": "folder",
+            "label": "4WD Robot Car",
+            "mode": "project",
+            "slug": "4wd-robot-car"
           }
         }
       ]

@@ -67,6 +67,10 @@ td {
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(255,255,255,0.04); }
 
+.highlighted td {
+  background: color-mix(in srgb, var(--color-link) 14%, transparent);
+}
+
 /* Name cell with inline notes */
 .nameCell { display: flex; flex-direction: column; gap: 2px; }
 .notes    { font-size: var(--text-xs); color: var(--color-muted); max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

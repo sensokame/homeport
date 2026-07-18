@@ -11,9 +11,10 @@ interface WidgetShellProps {
   publicUrl: string
   onStatusChange?: (status: 'ok' | 'warn' | 'error') => void
   onFocusRequest?: () => void
+  renderWidget?: WidgetProps['renderWidget']
 }
 
-export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange, onFocusRequest }: WidgetShellProps) {
+export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onStatusChange: onParentStatusChange, onFocusRequest, renderWidget }: WidgetShellProps) {
   const [status, setStatus] = useState<'ok' | 'warn' | 'error'>('ok')
 
   const onParentStatusChangeRef = useRef(onParentStatusChange)
@@ -31,6 +32,7 @@ export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onSta
     publicUrl,
     onStatusChange: handleStatusChange,
     onFocusRequest,
+    renderWidget,
   }
 
   if (manifest.fullScreen) {

@@ -16,8 +16,9 @@ The hub reads `dashboard.json` and renders a configurable tab dashboard. Each sa
 |---|---|
 | `apps/hub` | Hub — aggregates satellites into a tabbed widget dashboard |
 | `apps/infra` | Infrastructure satellite — Docker monitoring, system metrics, container actions |
-| `apps/inventory` | Inventory satellite — equipment and project tracker with shopping list |
-| `apps/obsidian` | Knowledge satellite — currently-reading books (Goodreads) + active Obsidian notes |
+| `apps/inventory` | Inventory satellite — equipment tracker with shopping list + per-project item assignments |
+| `apps/obsidian` | Knowledge satellite — currently-reading books (Goodreads) + active Obsidian notes + per-project tasks |
+| `apps/workspace` | Workspace satellite — composes other satellites' widgets into one card, manually or per vault project |
 | `apps/vikunja` | Tasks satellite — wraps Vikunja; shows due today and overdue |
 | `apps/wger` | Fitness satellite — wraps wger; shows workout and nutrition status |
 | `apps/actual` | Budget satellite — wraps Actual Budget; shows monthly spend summary |

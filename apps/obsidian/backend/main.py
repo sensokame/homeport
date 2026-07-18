@@ -25,6 +25,7 @@ QUARTZ_URL = os.getenv("QUARTZ_URL", "http://quartz.station")
 
 BOOKS_PATH = VAULT_PATH / "life" / "Books"
 WRITING_PATH = VAULT_PATH / "Writing" / "Writing"
+PROJECTS_PATH = VAULT_PATH / "Projects" / "projects"
 STATIC_DIR = Path(__file__).parent / "static"
 _YEAR_RE = re.compile(r"^\d{4}$")
 
@@ -179,11 +180,19 @@ def scan_vault_reading():
 
 @app.get("/api/catalog")
 def catalog():
-    return {"widgets": [
-        {"id": "knowledge.reading", "name": "Reading",
-         "description": "Currently reading books with per-book details and vault links",
-         "configSchema": {}},
-    ]}
+    return {
+        "widgets": [
+            {"id": "knowledge.reading", "name": "Reading",
+             "description": "Currently reading books with per-book details and vault links",
+             "configSchema": {}},
+            {"id": "knowledge.project-tasks", "name": "Project Tasks",
+             "description": "Open tasks and notes for one vault project (config: project_slug)",
+             "configSchema": {"project_slug": {"type": "string", "label": "Project slug", "required": True}}},
+        ],
+        "provides": ["project"],
+        "projectWidget": "knowledge.project-tasks",
+        "projectOrder": 10,
+    }
 
 
 @app.get("/widget")
@@ -515,6 +524,213 @@ def export_chapter_pdf(name: str, chapter: str):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Projects (v1.3.0 workspace-sat support) ─────────────────────────────────────
+
+_TASKS_HEADING_RE = re.compile(r"^##\s+Tasks\s*$", re.MULTILINE)
+_COMPLETED_HEADING_RE = re.compile(r"^##\s+Completed\s*$", re.MULTILINE)
+_NEXT_H2_RE = re.compile(r"^##\s+\S", re.MULTILINE)
+_H3_SPLIT_RE = re.compile(r"^###\s+(.+)$", re.MULTILINE)
+_CHECKBOX_RE = re.compile(r"^\s*-\s+\[ \]\s+(.+)$", re.MULTILINE)
+
+
+def _project_working_file(slug: str) -> Path | None:
+    base = PROJECTS_PATH / slug
+    for filename in ("tasks.md", "idea.md"):
+        f = base / filename
+        if f.exists():
+            return f
+    return None
+
+
+_BLOCK_START_RE = re.compile(r"^\s*(#{1,6}\s|>|\||[-*+]\s|\d+\.\s|\*\*[^*]+\*\*\s*:)")
+_INLINE_CODE_CAPTURE_RE = re.compile(r"`([^`]*)`")
+_WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
+
+
+def _project_description(slug: str) -> str | None:
+    """First plain paragraph right after the H1 title in idea.md — the vault's
+    established (if unwritten) convention for a one-line project pitch.
+
+    Always reads idea.md specifically, independent of _project_working_file:
+    tasks.md (what active projects graduate to) usually drops this paragraph
+    entirely in favour of milestone tables, so falling back to whichever file
+    tasks/notes came from would silently lose the description for exactly the
+    more mature projects.
+    """
+    f = PROJECTS_PATH / slug / "idea.md"
+    if not f.exists():
+        return None
+    lines = frontmatter.load(f).content.splitlines()
+    h1_idx = next((i for i, l in enumerate(lines) if l.startswith("# ")), None)
+    if h1_idx is None:
+        return None
+    i = h1_idx + 1
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i >= len(lines) or _BLOCK_START_RE.match(lines[i]):
+        return None
+    para: list[str] = []
+    while i < len(lines) and lines[i].strip():
+        para.append(lines[i].strip())
+        i += 1
+    text = " ".join(para)
+    text = _WIKILINK_RE.sub(lambda m: m.group(2) or m.group(1), text)
+    text = _LINK_RE.sub(r"\1", text)
+    text = _INLINE_CODE_CAPTURE_RE.sub(r"\1", text)
+    text = _EMPHASIS_RE.sub(r"\1", text)
+    text = _HTML_TAG_RE.sub("", text)
+    return text.strip() or None
+
+
+def _parse_tasks_section(text: str) -> list[dict]:
+    """Extract the ## Tasks section, split into ### sub-heading groups when present."""
+    m = _TASKS_HEADING_RE.search(text)
+    if not m:
+        return []
+    rest = text[m.end():]
+    next_h2 = _NEXT_H2_RE.search(rest)
+    section = rest[:next_h2.start()] if next_h2 else rest
+
+    groups: list[dict] = []
+    h3_matches = list(_H3_SPLIT_RE.finditer(section))
+    if not h3_matches:
+        items = _CHECKBOX_RE.findall(section)
+        if items:
+            groups.append({"heading": None, "items": items})
+        return groups
+
+    leading = section[:h3_matches[0].start()]
+    items = _CHECKBOX_RE.findall(leading)
+    if items:
+        groups.append({"heading": None, "items": items})
+    for i, hm in enumerate(h3_matches):
+        end = h3_matches[i + 1].start() if i + 1 < len(h3_matches) else len(section)
+        chunk = section[hm.end():end]
+        groups.append({"heading": hm.group(1).strip(), "items": _CHECKBOX_RE.findall(chunk)})
+    return groups
+
+
+def _project_payload(slug: str, filename: str, content: str) -> dict:
+    return {
+        "slug": slug,
+        "source_file": filename,
+        "description": _project_description(slug),
+        "tasks": _parse_tasks_section(content),
+        "notes_html": md_parser.markdown(content, extensions=["extra", "smarty"]),
+    }
+
+
+def _tasks_section_span(text: str) -> tuple[int, int] | None:
+    """Offsets of the ## Tasks section body (after the heading line, before the next H2)."""
+    m = _TASKS_HEADING_RE.search(text)
+    if not m:
+        return None
+    rest = text[m.end():]
+    next_h2 = _NEXT_H2_RE.search(rest)
+    return m.end(), m.end() + (next_h2.start() if next_h2 else len(rest))
+
+
+_CHECKBOX_LINE_RE = re.compile(r"^\s*-\s+\[ \]\s+(.+)$")
+
+
+def _find_task_line(section: str, heading: str | None, index: int) -> tuple[int, int, str] | None:
+    """Locate the checkbox line for (heading, index) within a ## Tasks section body.
+
+    Returns (start, end, task_text) with offsets relative to `section` (end excludes the
+    trailing newline), or None if the (heading, index) pair no longer matches — e.g. the
+    note was hand-edited in Obsidian since the widget last loaded it.
+
+    Matches line-by-line rather than with a cross-line regex: `_CHECKBOX_RE`'s leading
+    `\\s*` will happily eat the newline that separates a heading from its first item when
+    that item sits at position 0 of a finditer'd chunk, which would corrupt the file on
+    removal. Splitting into real lines first means `^` never sees anything but the line's
+    own content.
+    """
+    h3_matches = list(_H3_SPLIT_RE.finditer(section))
+    if heading is None:
+        chunk_start, chunk_end = 0, (h3_matches[0].start() if h3_matches else len(section))
+    else:
+        target = next((hm for hm in h3_matches if hm.group(1).strip() == heading), None)
+        if target is None:
+            return None
+        i = h3_matches.index(target)
+        chunk_start = target.end()
+        chunk_end = h3_matches[i + 1].start() if i + 1 < len(h3_matches) else len(section)
+
+    found: list[tuple[int, int, str]] = []
+    pos = chunk_start
+    for line in section[chunk_start:chunk_end].splitlines(keepends=True):
+        bare = line.rstrip("\n")
+        m = _CHECKBOX_LINE_RE.match(bare)
+        if m:
+            found.append((pos, pos + len(bare), m.group(1)))
+        pos += len(line)
+    if not (0 <= index < len(found)):
+        return None
+    return found[index]
+
+
+@app.get("/api/projects")
+def list_project_slugs():
+    if not PROJECTS_PATH.exists():
+        return []
+    return sorted(
+        d.name for d in PROJECTS_PATH.iterdir()
+        if d.is_dir() and not d.name.startswith(".")
+    )
+
+
+@app.get("/api/projects/{slug}")
+def get_project_tasks(slug: str):
+    f = _project_working_file(slug)
+    if not f:
+        raise HTTPException(status_code=404, detail="Project not found")
+    post = frontmatter.load(f)
+    return _project_payload(slug, f.name, post.content)
+
+
+class CompleteTaskRequest(BaseModel):
+    heading: str | None = None
+    index: int
+
+
+@app.post("/api/projects/{slug}/tasks/complete")
+def complete_task(slug: str, body: CompleteTaskRequest):
+    f = _project_working_file(slug)
+    if not f:
+        raise HTTPException(status_code=404, detail="Project not found")
+    post = frontmatter.load(f)
+    content = post.content
+
+    tasks_span = _tasks_section_span(content)
+    if not tasks_span:
+        raise HTTPException(status_code=404, detail="No Tasks section")
+    section_start, section_end = tasks_span
+    found = _find_task_line(content[section_start:section_end], body.heading, body.index)
+    if not found:
+        raise HTTPException(status_code=404, detail="Task not found")
+    rel_start, rel_end, task_text = found
+    line_start, line_end = section_start + rel_start, section_start + rel_end
+    if line_end < len(content) and content[line_end] == "\n":
+        line_end += 1
+    content = content[:line_start] + content[line_end:]
+
+    completed_line = f"- [x] {task_text}\n"
+    completed_m = _COMPLETED_HEADING_RE.search(content)
+    if completed_m:
+        rest = content[completed_m.end():]
+        next_h2 = _NEXT_H2_RE.search(rest)
+        insert_at = completed_m.end() + (next_h2.start() if next_h2 else len(rest))
+        content = content[:insert_at] + completed_line + content[insert_at:]
+    else:
+        sep = "" if content.endswith("\n") else "\n"
+        content = content + f"{sep}\n## Completed\n{completed_line}"
+
+    post.content = content
+    f.write_text(frontmatter.dumps(post) if post.metadata else content)
+    return _project_payload(slug, f.name, content)
 
 
 # ── Journal ──────────────────────────────────────────────────────────────────

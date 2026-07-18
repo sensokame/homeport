@@ -45,6 +45,24 @@ declare module 'knowledge/ReadingWidget' {
   export default component
 }
 
+declare module 'knowledge/ProjectTasksWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
+declare module 'inventory/ProjectItemsWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
+declare module 'workspace/WorkspacePanelWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
 declare module 'wger/FitnessWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent

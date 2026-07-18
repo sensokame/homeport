@@ -59,6 +59,8 @@ async def put_dashboard(request: Request):
 async def catalog():
     data = load_dashboard()
     results = {}
+    project_providers = {}
+    project_order = {}
     async with httpx.AsyncClient(timeout=5.0) as client:
         for sat in data.get("satellites", []):
             widget_url = sat.get("widgetUrl")
@@ -66,14 +68,24 @@ async def catalog():
                 continue
             try:
                 r = await client.get(widget_url.rstrip("/") + "/api/catalog")
-                results[sat["id"]] = r.json().get("widgets", [])
+                payload = r.json()
+                results[sat["id"]] = payload.get("widgets", [])
+                project_widget = payload.get("projectWidget")
+                if "project" in payload.get("provides", []) and project_widget:
+                    project_providers[sat["id"]] = project_widget
+                    project_order[sat["id"]] = payload.get("projectOrder", 100)
             except Exception:
                 results[sat["id"]] = []
     builtins = [
         {"id": "builtin.clock", "name": "Clock",
          "description": "Current time display", "configSchema": {}},
     ]
-    return {"builtins": builtins, "satellites": results}
+    return {
+        "builtins": builtins,
+        "satellites": results,
+        "projectProviders": project_providers,
+        "projectOrder": project_order,
+    }
 
 
 @app.api_route("/api/remote/{satellite_id}/{path:path}", methods=["GET"])

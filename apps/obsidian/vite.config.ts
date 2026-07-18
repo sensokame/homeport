@@ -11,6 +11,7 @@ export default defineConfig({
       filename: 'remoteEntry.js',
       exposes: {
         './ReadingWidget': './src/widgets/ReadingWidget.entry',
+        './ProjectTasksWidget': './src/widgets/ProjectTasksWidget.entry',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },

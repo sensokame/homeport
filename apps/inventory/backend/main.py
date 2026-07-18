@@ -39,22 +39,13 @@ def init_db():
                 created_at           TEXT NOT NULL,
                 updated_at           TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS projects (
-                id           TEXT PRIMARY KEY,
-                name         TEXT NOT NULL,
-                description  TEXT DEFAULT '',
-                status       TEXT DEFAULT 'planning',
-                created_at   TEXT NOT NULL,
-                updated_at   TEXT NOT NULL
-            );
             CREATE TABLE IF NOT EXISTS item_assignments (
                 id                 TEXT PRIMARY KEY,
                 item_id            TEXT NOT NULL,
-                project_id         TEXT NOT NULL,
+                project_slug       TEXT NOT NULL,
                 quantity_reserved  REAL DEFAULT 0,
                 notes              TEXT DEFAULT '',
-                FOREIGN KEY (item_id)    REFERENCES items(id),
-                FOREIGN KEY (project_id) REFERENCES projects(id)
+                FOREIGN KEY (item_id) REFERENCES items(id)
             );
         """)
 
@@ -97,12 +88,54 @@ def item_row(row: sqlite3.Row) -> dict:
     return d
 
 
+# v1.3.0: inventory's own `projects` table (freeform, disconnected from the vault) is
+# retired in favor of referencing vault project folder slugs directly. One-time mapping
+# from the old project ids to their vault slug, used to migrate existing assignments below.
+LEGACY_PROJECT_SLUGS = {
+    "fb50512e-2fc9-42be-87c7-fc2d81e5a7ed": "home-server",        # Home Server Build
+    "04f14f10-5c88-4119-8ec9-d736f224a54e": "home-server",        # ZFS Pool Setup -> merged into home-server
+    "54926983-2585-4a88-867a-73df4780d273": "cyber-deck-phone",   # Cyber Deck (Repurposed Phone)
+    "b6132232-0acc-4baf-aeef-96fc9fdc69fa": "cyber-deck-console", # Cyber Deck (Console)
+    "7822ac04-59af-43a7-bb47-377e36a84e10": "4wd-robot-car",      # 4WD Robot Car
+    "4ec28579-40c6-4d3a-b6fe-84d63023ffd0": "beacon",             # Beacon
+}
+
+
 def migrate_db():
     with sqlite3.connect(DB_PATH) as conn:
         try:
             conn.execute("ALTER TABLE items ADD COLUMN quantity_on_order REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass  # column already exists
+
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(item_assignments)")}
+        if "project_id" in columns:
+            # project_id is part of a FOREIGN KEY constraint, which SQLite's
+            # ALTER TABLE ... DROP COLUMN refuses to touch — rebuild the table instead.
+            if "project_slug" not in columns:
+                conn.execute("ALTER TABLE item_assignments ADD COLUMN project_slug TEXT")
+            for old_id, slug in LEGACY_PROJECT_SLUGS.items():
+                conn.execute(
+                    "UPDATE item_assignments SET project_slug = ? WHERE project_id = ? AND project_slug IS NULL",
+                    (slug, old_id),
+                )
+            conn.execute("""
+                CREATE TABLE item_assignments_new (
+                    id                 TEXT PRIMARY KEY,
+                    item_id            TEXT NOT NULL,
+                    project_slug       TEXT NOT NULL,
+                    quantity_reserved  REAL DEFAULT 0,
+                    notes              TEXT DEFAULT '',
+                    FOREIGN KEY (item_id) REFERENCES items(id)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO item_assignments_new (id, item_id, project_slug, quantity_reserved, notes)
+                SELECT id, item_id, project_slug, quantity_reserved, notes FROM item_assignments
+            """)
+            conn.execute("DROP TABLE item_assignments")
+            conn.execute("ALTER TABLE item_assignments_new RENAME TO item_assignments")
+            conn.execute("DROP TABLE IF EXISTS projects")
 
 
 init_db()
@@ -139,18 +172,6 @@ class ItemUpdate(BaseModel):
     quantity_on_order: Optional[float] = None
 
 
-class ProjectCreate(BaseModel):
-    name: str
-    description: str = ""
-    status: str = "planning"
-
-
-class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[str] = None
-
-
 class AssignmentCreate(BaseModel):
     item_id: str
     quantity_reserved: float = 0
@@ -161,11 +182,19 @@ class AssignmentCreate(BaseModel):
 
 @app.get("/api/catalog")
 def catalog():
-    return {"widgets": [
-        {"id": "inventory.overview", "name": "Inventory",
-         "description": "Stock overview and per-project item needs",
-         "configSchema": {}},
-    ]}
+    return {
+        "widgets": [
+            {"id": "inventory.overview", "name": "Inventory",
+             "description": "Stock overview and per-project item needs",
+             "configSchema": {}},
+            {"id": "inventory.project-items", "name": "Project Items",
+             "description": "Items assigned to one project (config: project_slug)",
+             "configSchema": {"project_slug": {"type": "string", "label": "Project slug", "required": True}}},
+        ],
+        "provides": ["project"],
+        "projectWidget": "inventory.project-items",
+        "projectOrder": 20,
+    }
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -174,7 +203,7 @@ def catalog():
 def widget():
     with get_conn() as conn:
         total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
-        projects = conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
+        projects = conn.execute("SELECT COUNT(DISTINCT project_slug) FROM item_assignments").fetchone()[0]
         low = conn.execute(
             """SELECT COUNT(*) FROM items i
                WHERE (threshold > 0 AND
@@ -200,20 +229,23 @@ def widget():
 @app.get("/api/widget/projects")
 def widget_projects():
     with get_conn() as conn:
-        projects = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
+        slugs = conn.execute(
+            "SELECT DISTINCT project_slug FROM item_assignments ORDER BY project_slug"
+        ).fetchall()
         result = []
-        for p in projects:
+        for row in slugs:
+            slug = row["project_slug"]
             assignments = conn.execute(
                 """SELECT ia.item_id, i.name AS item_name, i.status AS item_status,
                           ia.quantity_reserved, i.unit, ia.notes
                    FROM item_assignments ia
                    JOIN items i ON i.id = ia.item_id
-                   WHERE ia.project_id = ? AND i.status != 'in_stock'
+                   WHERE ia.project_slug = ? AND i.status != 'in_stock'
                    ORDER BY i.name""",
-                (p["id"],),
+                (slug,),
             ).fetchall()
             if assignments:
-                result.append({**dict(p), "assignments": [dict(a) for a in assignments]})
+                result.append({"slug": slug, "assignments": [dict(a) for a in assignments]})
     return result
 
 
@@ -303,88 +335,42 @@ def delete_item(item_id: str):
         conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
 
 
-# ── Projects ──────────────────────────────────────────────────────────────────
+# ── Projects (vault-backed — inventory only stores assignments scoped by slug) ──
 
 @app.get("/api/projects")
-def list_projects():
+def list_project_slugs():
     with get_conn() as conn:
-        rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
-        result = []
-        for r in rows:
-            p = dict(r)
-            p["item_count"] = conn.execute(
-                "SELECT COUNT(*) FROM item_assignments WHERE project_id = ?", (p["id"],)
-            ).fetchone()[0]
-            result.append(p)
-    return result
+        rows = conn.execute(
+            """SELECT project_slug AS slug, COUNT(*) AS item_count
+               FROM item_assignments GROUP BY project_slug ORDER BY project_slug"""
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
-@app.post("/api/projects", status_code=201)
-def create_project(body: ProjectCreate):
-    pid = new_id()
-    ts = now()
+@app.get("/api/projects/{slug}/items")
+def get_project_items(slug: str):
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO projects VALUES (?,?,?,?,?,?)",
-            (pid, body.name, body.description, body.status, ts, ts),
-        )
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
-    return dict(row)
-
-
-@app.get("/api/projects/{project_id}")
-def get_project(project_id: str):
-    with get_conn() as conn:
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="not found")
-        p = dict(row)
         assignments = conn.execute(
-            """SELECT ia.id, ia.item_id, i.name as item_name,
-                      ia.quantity_reserved, ia.notes
+            """SELECT ia.id, ia.item_id, i.name as item_name, i.status as item_status,
+                      ia.quantity_reserved, i.unit, ia.notes
                FROM item_assignments ia
                JOIN items i ON i.id = ia.item_id
-               WHERE ia.project_id = ?""",
-            (project_id,),
+               WHERE ia.project_slug = ?
+               ORDER BY i.name""",
+            (slug,),
         ).fetchall()
-        p["assignments"] = [dict(a) for a in assignments]
-    return p
-
-
-@app.put("/api/projects/{project_id}")
-def update_project(project_id: str, body: ProjectUpdate):
-    fields = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not fields:
-        raise HTTPException(status_code=400, detail="no fields to update")
-    fields["updated_at"] = now()
-    set_clause = ", ".join(f"{k} = ?" for k in fields)
-    with get_conn() as conn:
-        conn.execute(
-            f"UPDATE projects SET {set_clause} WHERE id = ?",
-            list(fields.values()) + [project_id],
-        )
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="not found")
-    return dict(row)
-
-
-@app.delete("/api/projects/{project_id}", status_code=204)
-def delete_project(project_id: str):
-    with get_conn() as conn:
-        conn.execute("DELETE FROM item_assignments WHERE project_id = ?", (project_id,))
-        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    return {"slug": slug, "assignments": [dict(a) for a in assignments]}
 
 
 # ── Assignments ───────────────────────────────────────────────────────────────
 
-@app.post("/api/projects/{project_id}/assignments", status_code=201)
-def create_assignment(project_id: str, body: AssignmentCreate):
+@app.post("/api/projects/{slug}/assignments", status_code=201)
+def create_assignment(slug: str, body: AssignmentCreate):
     aid = new_id()
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO item_assignments VALUES (?,?,?,?,?)",
-            (aid, body.item_id, project_id, body.quantity_reserved, body.notes),
+            (aid, body.item_id, slug, body.quantity_reserved, body.notes),
         )
         row = conn.execute(
             """SELECT ia.id, ia.item_id, i.name as item_name,
@@ -397,12 +383,12 @@ def create_assignment(project_id: str, body: AssignmentCreate):
     return dict(row)
 
 
-@app.delete("/api/projects/{project_id}/assignments/{assignment_id}", status_code=204)
-def delete_assignment(project_id: str, assignment_id: str):
+@app.delete("/api/projects/{slug}/assignments/{assignment_id}", status_code=204)
+def delete_assignment(slug: str, assignment_id: str):
     with get_conn() as conn:
         conn.execute(
-            "DELETE FROM item_assignments WHERE id = ? AND project_id = ?",
-            (assignment_id, project_id),
+            "DELETE FROM item_assignments WHERE id = ? AND project_slug = ?",
+            (assignment_id, slug),
         )
 
 

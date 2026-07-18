@@ -40,6 +40,22 @@ function fmtTime(d: Date) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+function formatSlug(slug: string): string {
+  return slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+}
+
+function workspaceInstanceFromHash(): WidgetInstance | null {
+  const m = window.location.hash.match(/^#\/workspace\/(.+)$/)
+  if (!m) return null
+  const slug = decodeURIComponent(m[1])
+  return {
+    instanceId: `workspace-hash-${slug}`,
+    widgetId: 'workspace.panel',
+    satelliteId: 'workspace',
+    config: { mode: 'project', slug, label: formatSlug(slug) },
+  }
+}
+
 export default function App() {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [dashboard, setDashboard] = useState<DashboardConfig | null>(null)
@@ -49,6 +65,24 @@ export default function App() {
   const [clock, setClock] = useState(() => fmtTime(new Date()))
   const [widgetStatuses, setWidgetStatuses] = useState<Record<string, 'ok' | 'warn' | 'error'>>({})
   const [focusedInstanceId, setFocusedInstanceId] = useState<string | null>(null)
+  const [syntheticFocus, setSyntheticFocus] = useState<WidgetInstance | null>(() => workspaceInstanceFromHash())
+
+  const exitFocus = useCallback(() => {
+    setFocusedInstanceId(null)
+    setSyntheticFocus(null)
+    if (window.location.hash.startsWith('#/workspace/')) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const instance = workspaceInstanceFromHash()
+      if (instance) setSyntheticFocus(instance)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   const handleWidgetStatus = useCallback((instanceId: string, status: 'ok' | 'warn' | 'error') => {
     setWidgetStatuses(prev => ({ ...prev, [instanceId]: status }))
@@ -89,7 +123,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (focusedInstanceId || !dashboard || dashboard.tabs.length < 2) return
+    if (focusedInstanceId || syntheticFocus || !dashboard || dashboard.tabs.length < 2) return
     const ids = dashboard.tabs.map(t => t.id)
     let startX = 0, startY = 0, insideCard = false
     function onTouchStart(e: TouchEvent) {
@@ -216,6 +250,25 @@ export default function App() {
   const activeTab = dashboard?.tabs.find(t => t.id === activeTabId) ?? null
   const satMap = Object.fromEntries((dashboard?.satellites ?? []).map(s => [s.id, s]))
 
+  const renderWidget = (satelliteId: string, widgetId: string, config: Record<string, unknown>) => {
+    const manifest = registry[widgetId]
+    if (!manifest) return <div className={styles.missingWidget}>Unknown widget: {widgetId}</div>
+    const sat = satMap[satelliteId]
+    const Widget = manifest.component
+    return (
+      <WidgetErrorBoundary widgetId={widgetId}>
+        <Suspense fallback={<div className={styles.missingWidget}>loading…</div>}>
+          <Widget
+            config={config}
+            satelliteUrl={`/api/proxy/${satelliteId}`}
+            publicUrl={sat?.url ?? ''}
+            onStatusChange={() => {}}
+          />
+        </Suspense>
+      </WidgetErrorBoundary>
+    )
+  }
+
   const allInstances = dashboard?.tabs.flatMap(t => t.widgets) ?? []
   const statusCounts = { ok: 0, warn: 0, error: 0 }
   for (const inst of allInstances) {
@@ -223,9 +276,9 @@ export default function App() {
     statusCounts[s]++
   }
 
-  const focusedInstance = focusedInstanceId
+  const focusedInstance = syntheticFocus ?? (focusedInstanceId
     ? (dashboard?.tabs.flatMap(t => t.widgets).find(w => w.instanceId === focusedInstanceId) ?? null)
-    : null
+    : null)
 
   return (
     <div className={styles.root}>
@@ -239,7 +292,7 @@ export default function App() {
           <div className={styles.focusedWrapper}>
             <div className={styles.focusedHeader}>
               <span className={styles.focusedLabel}>focus mode</span>
-              <button className={styles.exitFocusBtn} onClick={() => setFocusedInstanceId(null)}>← back</button>
+              <button className={styles.exitFocusBtn} onClick={exitFocus}>← back</button>
             </div>
             <div className={styles.focusedContent}>
               <Suspense fallback={<p className={styles.muted}>loading…</p>}>
@@ -249,6 +302,7 @@ export default function App() {
                   publicUrl={sat?.url ?? ''}
                   isFocused={true}
                   onStatusChange={() => {}}
+                  renderWidget={renderWidget}
                 />
               </Suspense>
             </div>
@@ -314,6 +368,7 @@ export default function App() {
                           publicUrl={sat?.url ?? ''}
                           onStatusChange={(s) => handleWidgetStatus(instance.instanceId, s)}
                           onFocusRequest={() => setFocusedInstanceId(instance.instanceId)}
+                          renderWidget={renderWidget}
                         />
                       </Suspense>
                       </WidgetErrorBoundary>

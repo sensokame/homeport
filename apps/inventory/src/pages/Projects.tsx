@@ -1,73 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Badge, Card, Modal, Input, Select, Textarea } from '@homeport/ui'
-import type { Project, Item, ProjectStatus } from '../types'
-import { getProjects, createProject, updateProject, deleteProject,
-         getProject, getItems, createAssignment, deleteAssignment } from '../api'
+import { Button, Card, Modal, Input, Select } from '@homeport/ui'
+import type { ProjectSummary, ProjectItems, Item } from '../types'
+import { getProjectSlugs, getProjectItems, getItems, createAssignment, deleteAssignment } from '../api'
 import styles from './Projects.module.css'
 
-const STATUS_VARIANTS: Record<ProjectStatus, 'ok' | 'warn' | 'error' | 'default'> = {
-  planning: 'default',
-  active:   'ok',
-  paused:   'warn',
-  done:     'default',
+function formatSlug(slug: string): string {
+  return slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
 }
 
-const BLANK = { name: '', description: '', status: 'planning' as ProjectStatus }
-
-function ConfirmModal({ message, onConfirm, onClose }: {
-  message: string
-  onConfirm: () => void
-  onClose: () => void
-}) {
-  return (
-    <Modal title="Confirm delete" onClose={onClose}>
-      <p className={styles.confirmMessage}>{message}</p>
-      <div className={styles.formActions}>
-        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button type="button" variant="danger" onClick={onConfirm}>Delete</Button>
-      </div>
-    </Modal>
-  )
-}
-
-function ProjectModal({ project, onSave, onClose }: {
-  project: Project | null
-  onSave: (data: Partial<Project>) => Promise<void>
-  onClose: () => void
-}) {
-  const [form, setForm] = useState(project ? { name: project.name, description: project.description, status: project.status } : BLANK)
-  const [saving, setSaving] = useState(false)
-  const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSaving(true)
-    try { await onSave(form) } finally { setSaving(false) }
-  }
-  return (
-    <Modal title={project ? 'Edit project' : 'Add project'} onClose={onClose}>
-      <form className={styles.form} onSubmit={submit}>
-        <Input label="Name *" value={form.name} onChange={e => set('name', e.target.value)} required />
-        <Textarea label="Description" value={form.description} onChange={e => set('description', e.target.value)} />
-        <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
-          <option value="planning">Planning</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="done">Done</option>
-        </Select>
-        <div className={styles.formActions}>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-function AssignModal({ projectId, onSave, onClose }: {
-  projectId: string
-  onSave: (itemId: string, qty: number, notes: string) => Promise<void>
+function AssignModal({ slug, knownSlugs, onSave, onClose }: {
+  slug: string | null
+  knownSlugs: string[]
+  onSave: (slug: string, itemId: string, qty: number, notes: string) => Promise<void>
   onClose: () => void
 }) {
   const [items, setItems] = useState<Item[]>([])
+  const [slugInput, setSlugInput] = useState(slug ?? '')
   const [itemId, setItemId] = useState('')
   const [qty, setQty] = useState(1)
   const [notes, setNotes] = useState('')
@@ -77,12 +25,30 @@ function AssignModal({ projectId, onSave, onClose }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true)
-    try { await onSave(itemId, qty, notes) } finally { setSaving(false) }
+    try { await onSave(slugInput.trim(), itemId, qty, notes) } finally { setSaving(false) }
   }
 
   return (
-    <Modal title="Assign item" onClose={onClose}>
+    <Modal title="Assign item to project" onClose={onClose}>
       <form className={styles.form} onSubmit={submit}>
+        {slug === null ? (
+          <>
+            <Input
+              label="Project slug *"
+              value={slugInput}
+              onChange={e => setSlugInput(e.target.value)}
+              placeholder="e.g. home-server"
+              list="project-slugs"
+              required
+            />
+            <datalist id="project-slugs">
+              {knownSlugs.map(s => <option key={s} value={s} />)}
+            </datalist>
+            <p className={styles.hint}>Must match a vault project folder name exactly (`Projects/projects/&lt;slug&gt;/`).</p>
+          </>
+        ) : (
+          <p className={styles.hint}>Assigning to <strong>{formatSlug(slug)}</strong></p>
+        )}
         <Select label="Item *" value={itemId} onChange={e => setItemId(e.target.value)} required>
           <option value="">Select an item…</option>
           {items.filter(i => (i.available ?? i.quantity) > 0).map(i => <option key={i.id} value={i.id}>{i.name} ({i.available ?? i.quantity} {i.unit} available)</option>)}
@@ -93,7 +59,7 @@ function AssignModal({ projectId, onSave, onClose }: {
         <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
         <div className={styles.formActions}>
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={saving || !itemId}>{saving ? 'Assigning…' : 'Assign'}</Button>
+          <Button type="submit" disabled={saving || !itemId || !slugInput.trim()}>{saving ? 'Assigning…' : 'Assign'}</Button>
         </div>
       </form>
     </Modal>
@@ -101,80 +67,62 @@ function AssignModal({ projectId, onSave, onClose }: {
 }
 
 export default function Projects() {
-  const [projects, setProjects]   = useState<Project[]>([])
-  const [selected, setSelected]   = useState<Project | null>(null)
-  const [loading, setLoading]     = useState(true)
-  const [modal, setModal]         = useState<'add' | Project | null>(null)
-  const [assignModal, setAssignModal] = useState(false)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [selected, setSelected] = useState<ProjectItems | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [assignModal, setAssignModal] = useState<'new' | 'selected' | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setProjects(await getProjects()) } finally { setLoading(false) }
+    try { setProjects(await getProjectSlugs()) } finally { setLoading(false) }
   }, [])
 
-  const loadDetail = useCallback(async (id: string) => {
-    setSelected(await getProject(id))
+  const loadDetail = useCallback(async (slug: string) => {
+    setSelected(await getProjectItems(slug))
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  const handleSave = async (data: Partial<Project>) => {
-    if (modal && modal !== 'add') await updateProject((modal as Project).id, data)
-    else await createProject(data)
-    setModal(null)
-    await load()
-    if (selected) await loadDetail(selected.id)
-  }
-
-  const doDelete = async () => {
-    if (!confirmId) return
-    await deleteProject(confirmId)
-    setConfirmId(null)
-    if (selected?.id === confirmId) setSelected(null)
-    await load()
-  }
-
   const handleUnassign = async (assignmentId: string) => {
     if (!selected) return
-    await deleteAssignment(selected.id, assignmentId)
-    await loadDetail(selected.id)
+    await deleteAssignment(selected.slug, assignmentId)
+    await loadDetail(selected.slug)
+    await load()
   }
 
-  const handleAssign = async (itemId: string, qty: number, notes: string) => {
-    if (!selected) return
-    await createAssignment(selected.id, { item_id: itemId, quantity_reserved: qty, notes })
-    setAssignModal(false)
-    await loadDetail(selected.id)
+  const handleAssign = async (slug: string, itemId: string, qty: number, notes: string) => {
+    await createAssignment(slug, { item_id: itemId, quantity_reserved: qty, notes })
+    setAssignModal(null)
+    await load()
+    if (selected?.slug === slug || assignModal === 'new') await loadDetail(slug)
   }
 
   return (
     <div className={styles.root}>
       <div className={styles.toolbar}>
-        <Button onClick={() => setModal('add')}>+ Add project</Button>
+        <Button onClick={() => setAssignModal('new')}>+ Assign item to project</Button>
       </div>
 
       {loading ? (
         <p className={styles.muted}>Loading…</p>
       ) : projects.length === 0 ? (
         <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No projects yet</p>
-          <p className={styles.emptyHint}>Create a project to start tracking item assignments.</p>
-          <Button onClick={() => setModal('add')}>+ Add project</Button>
+          <p className={styles.emptyTitle}>No project assignments yet</p>
+          <p className={styles.emptyHint}>Assign an item to a vault project slug to start tracking it here.</p>
+          <Button onClick={() => setAssignModal('new')}>+ Assign item to project</Button>
         </div>
       ) : (
         <div className={styles.grid}>
           {projects.map(p => (
             <Card
-              key={p.id}
-              className={`${styles.card} ${selected?.id === p.id ? styles.cardSelected : ''}`}
-              onClick={() => { setSelected(null); loadDetail(p.id) }}
+              key={p.slug}
+              className={`${styles.card} ${selected?.slug === p.slug ? styles.cardSelected : ''}`}
+              onClick={() => { setSelected(null); loadDetail(p.slug) }}
             >
               <div className={styles.cardHeader}>
-                <span className={styles.cardName}>{p.name}</span>
-                <Badge label={p.status} variant={STATUS_VARIANTS[p.status as ProjectStatus]} />
+                <span className={styles.cardName}>{formatSlug(p.slug)}</span>
               </div>
-              <p className={styles.cardMeta}>{p.item_count ?? 0} item{(p.item_count ?? 0) !== 1 ? 's' : ''} assigned</p>
+              <p className={styles.cardMeta}>{p.item_count} item{p.item_count !== 1 ? 's' : ''} assigned</p>
             </Card>
           ))}
         </div>
@@ -183,25 +131,27 @@ export default function Projects() {
       {selected && (
         <div className={styles.detail}>
           <div className={styles.detailHeader}>
-            <span className={styles.detailTitle}>{selected.name}</span>
-            <Badge label={selected.status} variant={STATUS_VARIANTS[selected.status]} />
-            <div className={styles.detailActions}>
-              <Button size="sm" variant="ghost" onClick={() => setModal(selected)}>Edit</Button>
-              <Button size="sm" variant="danger" onClick={() => setConfirmId(selected.id)}>Delete</Button>
-            </div>
+            <span className={styles.detailTitle}>{formatSlug(selected.slug)}</span>
+            <a
+              className={styles.workspaceLink}
+              href={`http://panel.station/#/workspace/${encodeURIComponent(selected.slug)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open in workspace →
+            </a>
           </div>
-          {selected.description && <p className={styles.detailDesc}>{selected.description}</p>}
 
           <div className={styles.assignSection}>
             <div className={styles.assignHeader}>
               <span className={styles.assignTitle}>Assigned items</span>
-              <Button size="sm" onClick={() => setAssignModal(true)}>+ Assign item</Button>
+              <Button size="sm" onClick={() => setAssignModal('selected')}>+ Assign item</Button>
             </div>
             <div className={styles.assignList}>
-              {(selected.assignments ?? []).length === 0 ? (
+              {selected.assignments.length === 0 ? (
                 <p className={styles.muted}>No items assigned yet.</p>
               ) : (
-                selected.assignments!.map(a => (
+                selected.assignments.map(a => (
                   <div key={a.id} className={styles.assignRow}>
                     <span className={styles.assignName}>{a.item_name}</span>
                     <span className={styles.assignQty}>× {a.quantity_reserved}</span>
@@ -215,21 +165,12 @@ export default function Projects() {
         </div>
       )}
 
-      {modal !== null && (
-        <ProjectModal
-          project={modal === 'add' ? null : modal as Project}
-          onSave={handleSave}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {assignModal && selected && (
-        <AssignModal projectId={selected.id} onSave={handleAssign} onClose={() => setAssignModal(false)} />
-      )}
-      {confirmId !== null && (
-        <ConfirmModal
-          message={`Delete "${projects.find(p => p.id === confirmId)?.name}"? All item assignments will be removed.`}
-          onConfirm={doDelete}
-          onClose={() => setConfirmId(null)}
+      {assignModal !== null && (
+        <AssignModal
+          slug={assignModal === 'selected' ? selected!.slug : null}
+          knownSlugs={projects.map(p => p.slug)}
+          onSave={handleAssign}
+          onClose={() => setAssignModal(null)}
         />
       )}
     </div>

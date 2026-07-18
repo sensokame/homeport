@@ -1,4 +1,4 @@
-import type { ComponentType, LazyExoticComponent } from 'react'
+import type { ComponentType, LazyExoticComponent, ReactNode } from 'react'
 
 export interface WidgetProps {
   config: Record<string, unknown>
@@ -10,6 +10,11 @@ export interface WidgetProps {
   onFocusRequest?: () => void
   /** True when the hub has entered focus mode for this widget; widget should render its focused view. */
   isFocused?: boolean
+  /**
+   * Embed another registered widget inline (by its full registry id, e.g. "inventory.project-items").
+   * Only provided to composition widgets (e.g. workspace-sat's panel) — most widgets never use this.
+   */
+  renderWidget?: (satelliteId: string, widgetId: string, config: Record<string, unknown>) => ReactNode
 }
 
 export type WidgetComponent = ComponentType<WidgetProps>

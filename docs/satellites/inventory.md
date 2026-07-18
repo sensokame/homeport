@@ -7,8 +7,8 @@ Equipment and project tracker. Manages items by category, quantity, and location
 ## Features
 
 - **Inventory tab** — search and filter items by category or status, add/edit/delete
-- **Projects tab** — create projects, assign items with reserved quantities
-- **Shopping list** — items at or below their restock threshold, or marked `ordered`/`depleted`
+- **Projects tab** — browse item assignments by vault project slug, assign items with reserved quantities (slug is free-text, matching a `Projects/projects/<slug>/` vault folder)
+- **Shopping list** — items at or below their restock threshold, or marked `ordered`/`depleted`/`needed`
 - `GET /widget` — live summary for the hub
 
 ---
@@ -34,6 +34,8 @@ Status: `ok` if no low-stock items, `warn` if any.
 
 ## Data model
 
+Project identity lives in the Obsidian vault (`Projects/projects/<slug>/`), not in inventory. Inventory has no `projects` table — it only stores assignments keyed on the vault's folder name (a plain string, no foreign key, no CRUD ownership).
+
 ### items
 
 | Column | Type | Notes |
@@ -45,19 +47,11 @@ Status: `ok` if no low-stock items, `warn` if any.
 | `quantity` | REAL | |
 | `unit` | TEXT | `pcs`, `m`, `g`, etc. |
 | `location` | TEXT | e.g. `Shelf A3` |
-| `status` | TEXT | `in_stock`, `low`, `ordered`, `depleted` |
+| `status` | TEXT | `in_stock`, `low`, `ordered`, `depleted`, `needed` |
 | `threshold` | REAL | Restock trigger quantity |
 | `specs` | TEXT | JSON blob — flexible key-value pairs |
 | `notes` | TEXT | |
-
-### projects
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | TEXT | UUID primary key |
-| `name` | TEXT | |
-| `description` | TEXT | |
-| `status` | TEXT | `planning`, `active`, `paused`, `done` |
+| `quantity_on_order` | REAL | |
 
 ### item_assignments
 
@@ -65,7 +59,7 @@ Status: `ok` if no low-stock items, `warn` if any.
 |---|---|---|
 | `id` | TEXT | UUID primary key |
 | `item_id` | TEXT | FK → items |
-| `project_id` | TEXT | FK → projects |
+| `project_slug` | TEXT | Vault project folder name, e.g. `4wd-robot-car` — no FK, no validation against a project table |
 | `quantity_reserved` | REAL | |
 | `notes` | TEXT | |
 
@@ -82,24 +76,30 @@ Status: `ok` if no low-stock items, `warn` if any.
 | `GET /api/items/{id}` | Single item |
 | `PUT /api/items/{id}` | Update item |
 | `DELETE /api/items/{id}` | Delete item and its assignments |
-| `GET /api/items/shopping-list` | Items at/below threshold or ordered/depleted |
+| `GET /api/items/shopping-list` | Items at/below threshold or ordered/depleted/needed |
 
-**Projects**
+**Projects** (derived from assignments — inventory doesn't own project identity)
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/projects` | List projects |
-| `POST /api/projects` | Create project |
-| `GET /api/projects/{id}` | Project with assigned items |
-| `PUT /api/projects/{id}` | Update project |
-| `DELETE /api/projects/{id}` | Delete project and its assignments |
+| `GET /api/projects` | Distinct slugs with at least one assignment, plus `item_count` — not the full vault project list, see [knowledge-sat](knowledge.md) for that |
+| `GET /api/projects/{slug}/items` | Assignments for one slug (always 200, empty list if none) |
 
 **Assignments**
 
 | Endpoint | Description |
 |---|---|
-| `POST /api/projects/{id}/assignments` | Assign item to project |
-| `DELETE /api/projects/{id}/assignments/{aid}` | Remove assignment |
+| `POST /api/projects/{slug}/assignments` | Assign item to a project slug (creates the slug's first appearance implicitly — no separate "create project" step) |
+| `DELETE /api/projects/{slug}/assignments/{aid}` | Remove assignment |
+
+---
+
+## Widgets
+
+| Widget id | Config | Description |
+|---|---|---|
+| `inventory.overview` | none | Card + focus SwipeableCard: item attention list, plus one page per project slug with active (non-`in_stock`) assignments |
+| `inventory.project-items` | `project_slug` (required) | Renders one project's assigned items — designed to be embedded by [workspace-sat](workspace.md) in project mode, not added directly to a dashboard tab |
 
 ---
 
