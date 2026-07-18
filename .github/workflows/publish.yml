@@ -59,8 +59,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract tag message
+        id: tag_message
+        run: |
+          {
+            echo 'body<<EOF'
+            git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.tag_message.outputs.body }}
           make_latest: true
