@@ -1,9 +1,11 @@
+import json
 import os
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from email.utils import parsedate
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -188,6 +190,9 @@ def catalog():
             {"id": "knowledge.project-tasks", "name": "Project Tasks",
              "description": "Open tasks and notes for one vault project (config: project_slug)",
              "configSchema": {"project_slug": {"type": "string", "label": "Project slug", "required": True}}},
+            {"id": "knowledge.writing", "name": "Writing",
+             "description": "Writing projects with chapter status, word counts, and tracked writing sessions",
+             "configSchema": {}},
         ],
         "provides": ["project"],
         "projectWidget": "knowledge.project-tasks",
@@ -417,6 +422,37 @@ def _recent_activity(path: Path, days: int = 7) -> int:
     )
 
 
+def _writing_meta_path(name: str) -> Path:
+    return _writing_project_path(name) / ".writing-meta.json"
+
+
+def _load_writing_meta(name: str) -> dict:
+    p = _writing_meta_path(name)
+    if not p.exists():
+        return {"chapter_status": {}, "sessions": [], "open_session": None}
+    return json.loads(p.read_text())
+
+
+def _save_writing_meta(name: str, meta: dict) -> None:
+    _writing_meta_path(name).write_text(json.dumps(meta, indent=2))
+
+
+def _project_word_count(name: str) -> int:
+    return sum(_word_count(f.read_text()) for f in _content_files(name))
+
+
+def _current_streak_days(sessions: list[dict]) -> int:
+    session_dates = {
+        datetime.fromisoformat(s["ended_at"]).date() for s in sessions
+    }
+    streak = 0
+    day = date.today()
+    while day in session_dates:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
+
+
 @app.get("/api/writing/projects")
 def list_projects():
     if not WRITING_PATH.exists():
@@ -447,6 +483,10 @@ def get_project(name: str):
         raise HTTPException(status_code=404, detail="Project not found")
     chapter_files = _content_files(name)
     word_count = sum(_word_count(f.read_text()) for f in chapter_files)
+    meta = _load_writing_meta(name)
+    status_counts = {"draft": 0, "revision": 0, "final": 0}
+    for f in chapter_files:
+        status_counts[meta["chapter_status"].get(f.stem, "draft")] += 1
     return {
         "name": name,
         "characters": len(_list_md_stems(base / "characters")),
@@ -455,6 +495,8 @@ def get_project(name: str):
         "chapters": len(chapter_files),
         "word_count": word_count,
         "recent_activity": _recent_activity(base),
+        "chapter_status_counts": status_counts,
+        "current_streak_days": _current_streak_days(meta["sessions"]),
     }
 
 
@@ -479,8 +521,13 @@ def create_character(name: str, body: CharacterRequest):
 
 @app.get("/api/writing/projects/{name}/chapters")
 def list_chapters(name: str):
+    meta = _load_writing_meta(name)
     return [
-        {"stem": f.stem, "word_count": _word_count(f.read_text())}
+        {
+            "stem": f.stem,
+            "word_count": _word_count(f.read_text()),
+            "status": meta["chapter_status"].get(f.stem, "draft"),
+        }
         for f in _content_files(name)
     ]
 
@@ -524,6 +571,64 @@ def export_chapter_pdf(name: str, chapter: str):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+class ChapterStatusRequest(BaseModel):
+    status: Literal["draft", "revision", "final"]
+
+
+@app.patch("/api/writing/projects/{name}/chapters/{chapter}/status")
+def set_chapter_status(name: str, chapter: str, body: ChapterStatusRequest):
+    if not _find_chapter_file(name, chapter):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    meta = _load_writing_meta(name)
+    meta["chapter_status"][chapter] = body.status
+    _save_writing_meta(name, meta)
+    return {"stem": chapter, "status": body.status}
+
+
+@app.post("/api/writing/projects/{name}/sessions/start")
+def start_writing_session(name: str):
+    if not _writing_project_path(name).exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    meta = _load_writing_meta(name)
+    if meta["open_session"] is not None:
+        raise HTTPException(status_code=409, detail="A session is already open")
+    meta["open_session"] = {
+        "started_at": datetime.now(tz=timezone.utc).isoformat(),
+        "word_count_start": _project_word_count(name),
+    }
+    _save_writing_meta(name, meta)
+    return meta["open_session"]
+
+
+@app.post("/api/writing/projects/{name}/sessions/end")
+def end_writing_session(name: str):
+    meta = _load_writing_meta(name)
+    open_session = meta["open_session"]
+    if open_session is None:
+        raise HTTPException(status_code=409, detail="No session is open")
+    ended_at = datetime.now(tz=timezone.utc)
+    started_at = datetime.fromisoformat(open_session["started_at"])
+    word_count_end = _project_word_count(name)
+    record = {
+        "started_at": open_session["started_at"],
+        "ended_at": ended_at.isoformat(),
+        "word_count_start": open_session["word_count_start"],
+        "word_count_end": word_count_end,
+        "delta": word_count_end - open_session["word_count_start"],
+        "duration_seconds": int((ended_at - started_at).total_seconds()),
+    }
+    meta["sessions"].append(record)
+    meta["open_session"] = None
+    _save_writing_meta(name, meta)
+    return record
+
+
+@app.get("/api/writing/projects/{name}/sessions")
+def list_writing_sessions(name: str):
+    meta = _load_writing_meta(name)
+    return {"sessions": meta["sessions"], "open_session": meta["open_session"]}
 
 
 # ── Projects (v1.3.0 workspace-sat support) ─────────────────────────────────────

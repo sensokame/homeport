@@ -38,6 +38,7 @@ Status is always `ok` — the satellite is read-only and degrades gracefully.
 |---|---|---|
 | `knowledge.reading` | none | Currently-reading books, card + focus session mode |
 | `knowledge.project-tasks` | `project_slug` (required) | Open task checklist + collapsible rendered notes for one project — designed to be embedded by [workspace-sat](workspace.md) in project mode, not added directly to a dashboard tab |
+| `knowledge.writing` | none | Writing projects with chapter status, word counts, and streaks; card + focus session mode (start/end tracked writing sessions) |
 
 ---
 
@@ -80,6 +81,19 @@ Reads the project's working file — `tasks.md` if present, else `idea.md` (the 
 - `tasks` parses the `## Tasks` section only — open `- [ ]` checkboxes, never checked ones (those live in `## Completed`). Grouped by `### <sub-heading>` when the project uses multi-track task lists (e.g. a project with several independent efforts under one folder); a `heading: null` group holds items with no sub-heading.
 - `notes_html` is the *entire* working file rendered as HTML (frontmatter stripped, `markdown` + `extra`/`smarty` extensions — same renderer used for chapter PDF export). Not just the Tasks section — callers decide how much to show.
 
+### Writing companion (v1.4.0)
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/writing/projects/{name}` | Word count, chapter/character/event counts, `chapter_status_counts` (draft/revision/final tallies), `current_streak_days` |
+| `GET /api/writing/projects/{name}/chapters` | Per-chapter `{stem, word_count, status}` |
+| `PATCH /api/writing/projects/{name}/chapters/{chapter}/status` | Body `{status: "draft"\|"revision"\|"final"}` |
+| `POST /api/writing/projects/{name}/sessions/start` | Snapshots current word count; 409 if a session is already open |
+| `POST /api/writing/projects/{name}/sessions/end` | Computes word delta + duration from the open session, appends it to the log; 409 if none is open |
+| `GET /api/writing/projects/{name}/sessions` | Closed session history + the current `open_session` if any |
+
+Chapter status and session history are stored in a hidden per-project sidecar file, `<project>/.writing-meta.json`, inside the vault — no separate database. Prose chapter files are never touched by this feature (status lives in the sidecar, not chapter frontmatter).
+
 ---
 
 ## docker-compose.yml
@@ -91,7 +105,7 @@ services:
     container_name: knowledge
     restart: unless-stopped
     volumes:
-      - /path/to/vault:/vault:ro
+      - /path/to/vault:/vault
     environment:
       - GOODREADS_USER_ID=your_user_id
     networks:
@@ -102,4 +116,4 @@ networks:
     external: true
 ```
 
-The vault is mounted read-only. The satellite never writes to it.
+The vault is mounted read-write: the satellite reads reading/writing/project data from it and also writes to it — completing a project task moves it into a `## Completed` section in the source file, and the writing companion above stores its `.writing-meta.json` sidecar per project.

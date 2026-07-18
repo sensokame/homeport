@@ -56,6 +56,14 @@
           "config": {
             "icon": "book-open"
           }
+        },
+        {
+          "instanceId": "knowledge-writing",
+          "widgetId": "knowledge.writing",
+          "satelliteId": "knowledge",
+          "config": {
+            "icon": "pen-line"
+          }
         }
       ]
     },

@@ -8,6 +8,7 @@ const InventoryOverviewWidget = lazy(() => import('inventory/InventoryOverviewWi
 const InventoryProjectItemsWidget = lazy(() => import('inventory/ProjectItemsWidget'))
 const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
 const KnowledgeProjectTasksWidget = lazy(() => import('knowledge/ProjectTasksWidget'))
+const WritingWidget          = lazy(() => import('knowledge/WritingWidget'))
 const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
@@ -50,6 +51,14 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: { project_slug: { type: 'string', label: 'Project slug', required: true } },
     component: KnowledgeProjectTasksWidget,
     defaultIcon: 'check-square',
+  },
+  'knowledge.writing': {
+    id: 'knowledge.writing',
+    name: 'Writing',
+    description: 'Writing projects with chapter status, word counts, and tracked writing sessions',
+    configSchema: {},
+    component: WritingWidget,
+    defaultIcon: 'pen-line',
   },
   'workspace.panel': {
     id: 'workspace.panel',

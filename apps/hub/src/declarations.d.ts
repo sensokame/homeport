@@ -51,6 +51,12 @@ declare module 'knowledge/ProjectTasksWidget' {
   export default component
 }
 
+declare module 'knowledge/WritingWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
 declare module 'inventory/ProjectItemsWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent
