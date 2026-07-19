@@ -54,3 +54,52 @@ export interface WritingProjectSummary {
   chapter_status_counts: Record<ChapterStatus, number>
   current_streak_days: number
 }
+
+export interface MusicScheduleRow {
+  day: string
+  focus: string
+  session_shape: string
+}
+
+export interface MusicToday extends MusicScheduleRow {
+  subject: string
+}
+
+export interface MusicCurriculumItem {
+  index: number
+  text: string
+  done: boolean
+}
+
+export interface MusicProgressItem {
+  label: string
+  status: string
+}
+
+export interface MusicProgress {
+  ear_training: Record<string, MusicProgressItem>
+  scales: Record<string, MusicProgressItem>
+  sight_reading: Record<string, MusicProgressItem>
+}
+
+export interface MusicSession {
+  started_at: string
+  ended_at: string
+  subject: string
+  duration_seconds: number
+}
+
+export interface OpenMusicSession {
+  started_at: string
+  subject: string
+}
+
+export interface MusicOverview {
+  today: MusicToday | null
+  current_streak_days: number
+  curriculum_done: number
+  curriculum_total: number
+  progress: MusicProgress
+  last_session: MusicSession | null
+  open_session: OpenMusicSession | null
+}

@@ -9,6 +9,7 @@ const InventoryProjectItemsWidget = lazy(() => import('inventory/ProjectItemsWid
 const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
 const KnowledgeProjectTasksWidget = lazy(() => import('knowledge/ProjectTasksWidget'))
 const WritingWidget          = lazy(() => import('knowledge/WritingWidget'))
+const MusicWidget            = lazy(() => import('knowledge/MusicWidget'))
 const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
 const WorkspaceOverviewTeaserWidget = lazy(() => import('workspace/WorkspaceOverviewTeaserWidget'))
 
@@ -60,6 +61,16 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: WritingWidget,
     defaultIcon: 'pen-line',
+    defaultOpenPath: '/#/writing',
+  },
+  'knowledge.music': {
+    id: 'knowledge.music',
+    name: 'Music',
+    description: 'Practice log, theory curriculum, and ear-training/scales/sight-reading progress',
+    configSchema: {},
+    component: MusicWidget,
+    defaultIcon: 'music',
+    defaultOpenPath: '/#/music',
   },
   'workspace.panel': {
     id: 'workspace.panel',

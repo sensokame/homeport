@@ -57,6 +57,12 @@ declare module 'knowledge/WritingWidget' {
   export default component
 }
 
+declare module 'knowledge/MusicWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
 declare module 'inventory/ProjectItemsWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent

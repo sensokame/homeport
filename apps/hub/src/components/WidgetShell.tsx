@@ -53,7 +53,7 @@ export function WidgetShell({ manifest, instance, satelliteUrl, publicUrl, onSta
       </div>
       {publicUrl && (
         <div className={styles.footer}>
-          <a className={styles.link} href={publicUrl} target="_blank" rel="noopener">open →</a>
+          <a className={styles.link} href={publicUrl + (manifest.defaultOpenPath ?? '')} target="_blank" rel="noopener">open →</a>
         </div>
       )}
     </Card>

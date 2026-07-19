@@ -1,0 +1,219 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pageTitle {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.summary {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.metaRow {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.lastSession {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* ── Curriculum ── */
+
+.curriculumList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.curriculumRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.curriculumText {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.curriculumTextDone {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+/* ── Progress ── */
+
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.progressGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.progressGroupLabel {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.progressItemLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.progressBadge {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.focusStartBtn {
+  background: none;
+  border: 1px solid var(--color-link);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-link);
+  cursor: pointer;
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  transition: background 0.15s, color 0.15s;
+}
+
+.focusStartBtn:hover {
+  background: var(--color-link);
+  color: var(--color-bg);
+}
+
+.empty {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* ── Focused view ──────────────────────────── */
+
+.focusedPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+}
+
+.focusedBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 480px;
+  width: 100%;
+}
+
+.focusedMeta {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.focusedTitle {
+  font-size: clamp(24px, 5vw, 44px);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.startBtn {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-5);
+  background: none;
+  border: 1px solid var(--color-link);
+  border-radius: var(--radius-sm);
+  color: var(--color-link);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.startBtn:hover {
+  background: var(--color-link);
+  color: var(--color-bg);
+}
+
+.elapsed {
+  font-size: var(--text-lg);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  margin: 0;
+}
+
+.endBtn {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-5);
+  background: none;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.endBtn:hover {
+  background: var(--color-error);
+  color: var(--color-bg);
+}
+
+.doneMsg {
+  font-size: var(--text-lg);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.restartBtn {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.restartBtn:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}

@@ -13,6 +13,7 @@ export default defineConfig({
         './ReadingWidget': './src/widgets/ReadingWidget.entry',
         './ProjectTasksWidget': './src/widgets/ProjectTasksWidget.entry',
         './WritingWidget': './src/widgets/WritingWidget.entry',
+        './MusicWidget': './src/widgets/MusicWidget.entry',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },

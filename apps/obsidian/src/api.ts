@@ -1,4 +1,7 @@
-import type { Book, WritingProject, Chapter, JournalResponse, ActivityItem } from './types'
+import type {
+  Book, WritingProject, Chapter, JournalResponse, ActivityItem,
+  MusicOverview, MusicCurriculumItem, MusicSession, OpenMusicSession,
+} from './types'
 
 export async function fetchBooks(shelf: string): Promise<Book[]> {
   const r = await fetch(`/api/books?shelf=${encodeURIComponent(shelf)}`)
@@ -102,5 +105,43 @@ export async function saveJournal(content: string): Promise<void> {
 
 export async function fetchActivity(): Promise<ActivityItem[]> {
   const r = await fetch('/api/activity')
+  return r.json()
+}
+
+export async function fetchMusicOverview(): Promise<MusicOverview> {
+  const r = await fetch('/api/music/overview')
+  return r.json()
+}
+
+export async function fetchMusicCurriculum(): Promise<MusicCurriculumItem[]> {
+  const r = await fetch('/api/music/curriculum/theory')
+  return r.json()
+}
+
+export async function setMusicCurriculumDone(index: number, done: boolean): Promise<MusicCurriculumItem[]> {
+  const r = await fetch(`/api/music/curriculum/theory/${index}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done }),
+  })
+  return r.json()
+}
+
+export async function fetchMusicSessions(): Promise<{ sessions: MusicSession[]; open_session: OpenMusicSession | null }> {
+  const r = await fetch('/api/music/sessions')
+  return r.json()
+}
+
+export async function startMusicSession(subject: string): Promise<OpenMusicSession> {
+  const r = await fetch('/api/music/sessions/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject }),
+  })
+  return r.json()
+}
+
+export async function endMusicSession(): Promise<MusicSession> {
+  const r = await fetch('/api/music/sessions/end', { method: 'POST' })
   return r.json()
 }

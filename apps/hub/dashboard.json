@@ -64,6 +64,14 @@
           "config": {
             "icon": "pen-line"
           }
+        },
+        {
+          "instanceId": "knowledge-music",
+          "widgetId": "knowledge.music",
+          "satelliteId": "knowledge",
+          "config": {
+            "icon": "music"
+          }
         }
       ]
     },

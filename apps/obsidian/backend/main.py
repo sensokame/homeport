@@ -198,6 +198,9 @@ def catalog():
             {"id": "knowledge.writing", "name": "Writing",
              "description": "Writing projects with chapter status, word counts, and tracked writing sessions",
              "configSchema": {}},
+            {"id": "knowledge.music", "name": "Music",
+             "description": "Practice log, theory curriculum, and ear-training/scales/sight-reading progress",
+             "configSchema": {}},
         ],
         "provides": ["project"],
         "projectWidget": "knowledge.project-tasks",
@@ -1123,6 +1126,288 @@ def save_today_journal(body: JournalUpdate):
     return {"exists": True, "content": body.content}
 
 
+# ── Music ────────────────────────────────────────────────────────────────────
+# v1.6.0: mirrors the writing companion's "no new satellite, no new DB" pattern
+# (see homeport vault agent-integration.md / tasks.md) — a JSON sidecar for
+# session/progress data, direct in-place edits for the one real vault
+# checklist (schedule.md's Theory Curriculum), same as Journal for the daily
+# practice log.
+
+MUSIC_PATH = VAULT_PATH / "life" / "Music"
+MUSIC_SCHEDULE_PATH = MUSIC_PATH / "schedule.md"
+MUSIC_PRACTICE_LOG_PATH = MUSIC_PATH / "practice-log"
+
+_MUSIC_SUBJECTS = {"theory", "piano", "ear_training", "guitar", "review", "open"}
+_MUSIC_PROGRESS_SUBJECTS = {"ear_training", "scales", "sight_reading"}
+_MUSIC_PROGRESS_STATUS_VALUES = ["introduced", "practicing", "solid"]
+
+_MUSIC_ROTATION_HEADING_RE = re.compile(r"^##\s+Weekly Rotation\s*$", re.MULTILINE)
+_MUSIC_CURRICULUM_HEADING_RE = re.compile(r"^##\s+Theory Curriculum.*$", re.MULTILINE)
+_MUSIC_CHECKBOX_LINE_RE = re.compile(r"^(\s*-\s+\[)([ xX])(\]\s+)(.+)$")
+
+
+def _music_meta_path() -> Path:
+    return MUSIC_PATH / ".music-meta.json"
+
+
+def _load_music_meta() -> dict:
+    p = _music_meta_path()
+    if not p.exists():
+        meta = {"sessions": [], "open_session": None, "progress": {}}
+    else:
+        meta = json.loads(p.read_text())
+    meta.setdefault("sessions", [])
+    meta.setdefault("open_session", None)
+    meta.setdefault("progress", {})
+    for subject in _MUSIC_PROGRESS_SUBJECTS:
+        meta["progress"].setdefault(subject, {})
+    return meta
+
+
+def _save_music_meta(meta: dict) -> None:
+    _music_meta_path().write_text(json.dumps(meta, indent=2))
+
+
+def _normalize_subject(label: str) -> str:
+    return label.strip().lower().replace(" ", "_")
+
+
+def _parse_music_schedule(text: str) -> list[dict]:
+    """Structured read of schedule.md's '## Weekly Rotation' table (day/focus/
+    session shape) — same table-parsing approach as _parse_table_rows, just a
+    3-column shape instead of the Projects index's 4-column one."""
+    m = _MUSIC_ROTATION_HEADING_RE.search(text)
+    if not m:
+        return []
+    rest = text[m.end():]
+    next_h2 = _NEXT_H2_RE.search(rest)
+    section = rest[:next_h2.start()] if next_h2 else rest
+    lines = [l for l in section.splitlines() if _TABLE_ROW_RE.match(l)]
+    if len(lines) < 2:
+        return []
+    rows = []
+    for line in lines[2:]:  # skip header + separator row
+        if _TABLE_SEP_RE.match(line):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) == 3:
+            rows.append({"day": cells[0], "focus": cells[1], "session_shape": cells[2]})
+    return rows
+
+
+def _todays_music_slot() -> dict | None:
+    if not MUSIC_SCHEDULE_PATH.exists():
+        return None
+    today_name = datetime.now(tz=_TZ).strftime("%A")
+    for row in _parse_music_schedule(MUSIC_SCHEDULE_PATH.read_text()):
+        if row["day"].strip().lower() == today_name.lower():
+            return {**row, "subject": _normalize_subject(row["focus"])}
+    return None
+
+
+def _music_curriculum_section_span(text: str) -> tuple[int, int] | None:
+    m = _MUSIC_CURRICULUM_HEADING_RE.search(text)
+    if not m:
+        return None
+    rest = text[m.end():]
+    next_h2 = _NEXT_H2_RE.search(rest)
+    return m.end(), m.end() + (next_h2.start() if next_h2 else len(rest))
+
+
+def _parse_music_curriculum(text: str) -> list[dict]:
+    span = _music_curriculum_section_span(text)
+    if not span:
+        return []
+    section_start, section_end = span
+    items = []
+    for line in text[section_start:section_end].splitlines():
+        m = _MUSIC_CHECKBOX_LINE_RE.match(line)
+        if m:
+            items.append({"index": len(items), "text": m.group(4).strip(), "done": m.group(2).lower() == "x"})
+    return items
+
+
+def _set_music_curriculum_item(index: int, done: bool) -> list[dict]:
+    """Toggles the real checkbox in schedule.md in place — same line-by-line
+    approach as _find_task_line, for the same reason: a MULTILINE regex's
+    leading \\s* can eat the previous line's newline when matched mid-string,
+    corrupting the file. See the Projects section's _find_task_line docstring."""
+    if not MUSIC_SCHEDULE_PATH.exists():
+        raise HTTPException(status_code=404, detail="schedule.md not found")
+    text = MUSIC_SCHEDULE_PATH.read_text()
+    span = _music_curriculum_section_span(text)
+    if not span:
+        raise HTTPException(status_code=404, detail="No Theory Curriculum section")
+    section_start, section_end = span
+
+    found: list[tuple[int, int, re.Match]] = []
+    pos = section_start
+    for line in text[section_start:section_end].splitlines(keepends=True):
+        bare = line.rstrip("\n")
+        m = _MUSIC_CHECKBOX_LINE_RE.match(bare)
+        if m:
+            found.append((pos, pos + len(bare), m))
+        pos += len(line)
+
+    if not (0 <= index < len(found)):
+        raise HTTPException(status_code=404, detail="Curriculum item not found")
+    line_start, line_end, m = found[index]
+    new_line = f"{m.group(1)}{'x' if done else ' '}{m.group(3)}{m.group(4)}"
+    text = text[:line_start] + new_line + text[line_end:]
+    MUSIC_SCHEDULE_PATH.write_text(text)
+    return _parse_music_curriculum(text)
+
+
+@app.get("/api/music/overview")
+def get_music_overview():
+    meta = _load_music_meta()
+    curriculum = _parse_music_curriculum(MUSIC_SCHEDULE_PATH.read_text()) if MUSIC_SCHEDULE_PATH.exists() else []
+    sessions = meta["sessions"]
+    return {
+        "today": _todays_music_slot(),
+        "current_streak_days": _current_streak_days(sessions),
+        "curriculum_done": sum(1 for c in curriculum if c["done"]),
+        "curriculum_total": len(curriculum),
+        "progress": meta["progress"],
+        "last_session": sessions[-1] if sessions else None,
+        "open_session": meta["open_session"],
+    }
+
+
+@app.get("/api/music/schedule")
+def get_music_schedule():
+    if not MUSIC_SCHEDULE_PATH.exists():
+        return {"rotation": []}
+    return {"rotation": _parse_music_schedule(MUSIC_SCHEDULE_PATH.read_text())}
+
+
+@app.get("/api/music/curriculum/theory")
+def get_music_curriculum():
+    if not MUSIC_SCHEDULE_PATH.exists():
+        return []
+    return _parse_music_curriculum(MUSIC_SCHEDULE_PATH.read_text())
+
+
+class MusicCurriculumUpdate(BaseModel):
+    done: bool
+
+
+@app.patch("/api/music/curriculum/theory/{index}")
+def patch_music_curriculum(index: int, body: MusicCurriculumUpdate):
+    return _set_music_curriculum_item(index, body.done)
+
+
+@app.get("/api/music/progress")
+def get_music_progress():
+    return _load_music_meta()["progress"]
+
+
+class MusicProgressUpdate(BaseModel):
+    label: str
+    status: str
+
+
+@app.patch("/api/music/progress/{subject}/{item_slug}")
+def set_music_progress(subject: str, item_slug: str, body: MusicProgressUpdate):
+    if subject not in _MUSIC_PROGRESS_SUBJECTS:
+        raise HTTPException(status_code=422, detail=f"subject must be one of {sorted(_MUSIC_PROGRESS_SUBJECTS)}")
+    if body.status not in _MUSIC_PROGRESS_STATUS_VALUES:
+        raise HTTPException(status_code=422, detail=f"status must be one of {_MUSIC_PROGRESS_STATUS_VALUES}")
+    meta = _load_music_meta()
+    meta["progress"][subject][item_slug] = {"label": body.label, "status": body.status}
+    _save_music_meta(meta)
+    return meta["progress"][subject]
+
+
+class MusicSessionStartRequest(BaseModel):
+    subject: str
+
+
+@app.post("/api/music/sessions/start")
+def start_music_session(body: MusicSessionStartRequest):
+    if body.subject not in _MUSIC_SUBJECTS:
+        raise HTTPException(status_code=422, detail=f"subject must be one of {sorted(_MUSIC_SUBJECTS)}")
+    meta = _load_music_meta()
+    if meta["open_session"] is not None:
+        raise HTTPException(status_code=409, detail="A session is already open")
+    meta["open_session"] = {
+        "started_at": datetime.now(tz=timezone.utc).isoformat(),
+        "subject": body.subject,
+    }
+    _save_music_meta(meta)
+    return meta["open_session"]
+
+
+@app.post("/api/music/sessions/end")
+def end_music_session():
+    meta = _load_music_meta()
+    open_session = meta["open_session"]
+    if open_session is None:
+        raise HTTPException(status_code=409, detail="No session is open")
+    ended_at = datetime.now(tz=timezone.utc)
+    started_at = datetime.fromisoformat(open_session["started_at"])
+    record = {
+        "started_at": open_session["started_at"],
+        "ended_at": ended_at.isoformat(),
+        "subject": open_session["subject"],
+        "duration_seconds": int((ended_at - started_at).total_seconds()),
+    }
+    meta["sessions"].append(record)
+    meta["open_session"] = None
+    _save_music_meta(meta)
+    return record
+
+
+@app.get("/api/music/sessions")
+def list_music_sessions():
+    meta = _load_music_meta()
+    return {"sessions": meta["sessions"], "open_session": meta["open_session"]}
+
+
+_MUSIC_PRACTICE_LOG_TEMPLATE_SECTIONS = (
+    "Focus", "What I worked on", "What clicked", "What needs more work", "Notes / questions",
+)
+
+
+def _music_practice_log_template(day_str: str) -> str:
+    body = "\n\n\n".join(f"## {s}" for s in _MUSIC_PRACTICE_LOG_TEMPLATE_SECTIONS)
+    return f"# Practice Log — {day_str}\n\n{body}"
+
+
+def _today_practice_log_path() -> Path:
+    now = datetime.now(tz=_TZ)
+    return MUSIC_PRACTICE_LOG_PATH / now.strftime("%Y") / now.strftime("%m") / now.strftime("%Y-%m-%d.md")
+
+
+@app.get("/api/music/practice-log/today")
+def get_today_practice_log():
+    path = _today_practice_log_path()
+    if path.exists():
+        return {"exists": True, "content": path.read_text()}
+    return {"exists": False, "content": ""}
+
+
+@app.post("/api/music/practice-log/today")
+def create_today_practice_log():
+    path = _today_practice_log_path()
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_music_practice_log_template(datetime.now(tz=_TZ).strftime("%Y-%m-%d")))
+    return {"exists": True, "content": path.read_text()}
+
+
+class MusicPracticeLogUpdate(BaseModel):
+    content: str
+
+
+@app.put("/api/music/practice-log/today")
+def save_today_practice_log(body: MusicPracticeLogUpdate):
+    path = _today_practice_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body.content)
+    return {"exists": True, "content": body.content}
+
+
 # ── Activity ──────────────────────────────────────────────────────────────────
 
 _SKIP_PARTS = {".obsidian", ".trash", "Templates", ".git"}
@@ -1193,6 +1478,12 @@ def mcp_projects() -> list[str]:
 def mcp_writing_projects() -> list[str]:
     """Every writing project under Writing/Writing/ in the vault."""
     return list_projects()
+
+
+@mcp_server.resource("obsidian://music/overview", mime_type="application/json")
+def mcp_music_overview() -> dict:
+    """Today's music practice slot, streak, and curriculum/progress summary."""
+    return get_music_overview()
 
 
 def _task_text(slug: str, heading: str | None, index: int) -> str | None:

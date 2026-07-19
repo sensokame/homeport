@@ -4,9 +4,10 @@ import Reading from './pages/Reading'
 import Library from './pages/Library'
 import Writing from './pages/Writing'
 import Life from './pages/Life'
+import Music from './pages/Music'
 import styles from './App.module.css'
 
-type Section = 'reading' | 'writing' | 'life'
+type Section = 'reading' | 'writing' | 'life' | 'music'
 type Shelf = 'currently-reading' | 'read' | 'to-read'
 
 function parseHash(hash: string): { section: Section; shelf: Shelf; writingProject: string | null; writingChapter: string | null } {
@@ -15,6 +16,7 @@ function parseHash(hash: string): { section: Section; shelf: Shelf; writingProje
     return { section: 'writing', shelf: 'currently-reading', writingProject: project || null, writingChapter: chapter || null }
   }
   if (hash.startsWith('#/life')) return { section: 'life', shelf: 'currently-reading', writingProject: null, writingChapter: null }
+  if (hash.startsWith('#/music')) return { section: 'music', shelf: 'currently-reading', writingProject: null, writingChapter: null }
   if (hash === '#/read') return { section: 'reading', shelf: 'read', writingProject: null, writingChapter: null }
   if (hash === '#/to-read') return { section: 'reading', shelf: 'to-read', writingProject: null, writingChapter: null }
   return { section: 'reading', shelf: 'currently-reading', writingProject: null, writingChapter: null }
@@ -32,6 +34,7 @@ export default function App() {
   const sectionLinks = [
     { label: 'Reading', href: '#/', active: section === 'reading' },
     { label: 'Writing', href: '#/writing', active: section === 'writing' },
+    { label: 'Music', href: '#/music', active: section === 'music' },
     { label: 'Life', href: '#/life', active: section === 'life' },
   ]
 
@@ -80,12 +83,28 @@ export default function App() {
           </a>
         </div>
       )}
+      {section === 'music' && (
+        <div className={styles.shelfNav}>
+          <a href="#/music" className={[styles.shelfTab, styles.shelfTabActive].join(' ')}>
+            Overview
+          </a>
+          <a
+            className={styles.quartzBtn}
+            href="http://quartz.station"
+            target="_blank"
+            rel="noopener"
+          >
+            Open Quartz →
+          </a>
+        </div>
+      )}
       <main className={styles.main}>
         {section === 'reading' && shelf === 'currently-reading' && <Reading />}
         {section === 'reading' && shelf === 'read' && <Library shelf="read" />}
         {section === 'reading' && shelf === 'to-read' && <Library shelf="to-read" />}
         {section === 'writing' && <Writing initialProject={writingProject} initialChapter={writingChapter} />}
         {section === 'life' && <Life />}
+        {section === 'music' && <Music />}
       </main>
     </div>
   )
