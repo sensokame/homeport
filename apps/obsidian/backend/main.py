@@ -2,6 +2,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone, timedelta
 from email.utils import parsedate
 from pathlib import Path
@@ -16,7 +17,12 @@ import markdown as md_parser
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
+from pydantic import BaseModel, Field
+from starlette.middleware.cors import CORSMiddleware
+from starlette.routing import Route
 from weasyprint import HTML
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
@@ -196,6 +202,7 @@ def catalog():
         "provides": ["project"],
         "projectWidget": "knowledge.project-tasks",
         "projectOrder": 10,
+        "mcp": {"url": "http://knowledge:8080/mcp"},
     }
 
 
@@ -786,6 +793,8 @@ def _project_payload(slug: str, filename: str, content: str) -> dict:
         "source_file": filename,
         "description": _project_description(slug),
         "tasks": _parse_tasks_section(content),
+        "milestones": _parse_milestones(content),
+        "links": _project_links(slug),
         "notes_html": md_parser.markdown(content, extensions=["extra", "smarty"]),
     }
 
@@ -850,13 +859,173 @@ def list_project_slugs():
     )
 
 
+# ── Projects index overview (workspace-sat standalone page support) ────────────
+
+_INDEX_MD_PATH = PROJECTS_PATH / "index.md"
+_CATEGORY_H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_TABLE_ROW_RE = re.compile(r"^\|(.+)\|\s*$")
+_TABLE_SEP_RE = re.compile(r"^\|?[\s:|-]+\|?$")
+_STATUS_SPLIT_RE = re.compile(r"^(\S+)\s+(.+)$")
+_NOTES_SLUG_RE = re.compile(r"`([\w.-]+)/[^`]*`")
+
+
+def _clean_cell(text: str) -> str:
+    text = text.strip()
+    text = _WIKILINK_RE.sub(lambda m: m.group(2) or m.group(1), text)
+    text = _LINK_RE.sub(r"\1", text)
+    text = _INLINE_CODE_CAPTURE_RE.sub(r"\1", text)
+    text = _EMPHASIS_RE.sub(r"\1", text)
+    text = _HTML_TAG_RE.sub("", text)
+    return text.strip()
+
+
+def _parse_table_rows(section: str) -> list[list[str]] | None:
+    """Raw (uncleaned) cell strings for each data row of a 4-column
+    `| Project | Status | Next action | Notes |` table under some H2, or
+    None if this section's table isn't that shape (e.g. index.md's
+    On Hold/Inactive and Merged/Renamed tables use different column sets)."""
+    lines = [l for l in section.splitlines() if _TABLE_ROW_RE.match(l)]
+    if len(lines) < 2:
+        return None
+    header_cells = [c.strip() for c in lines[0].strip("|").split("|")]
+    if len(header_cells) != 4 or header_cells[1].lower() != "status":
+        return None
+    rows = []
+    for line in lines[2:]:  # skip header + separator row
+        if _TABLE_SEP_RE.match(line):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) == 4:
+            rows.append(cells)
+    return rows
+
+
+_MILESTONES_HEADING_RE = re.compile(r"^##\s+.*Milestones?\s*$", re.MULTILINE | re.IGNORECASE)
+
+
+def _parse_milestones(text: str) -> list[dict]:
+    """Structured read of a '## ... Milestones' table. Not every project has
+    one (only version-tagged projects like homeport/beacon do) — matched by
+    heading text + a 'Version' first column rather than a fixed column set,
+    since some tables add a Gate column and some don't. Returns [] (nothing
+    shown) when the shape doesn't match, same "declared or absent, never
+    guessed" precedent as the rest of this endpoint."""
+    m = _MILESTONES_HEADING_RE.search(text)
+    if not m:
+        return []
+    rest = text[m.end():]
+    next_h2 = _NEXT_H2_RE.search(rest)
+    section = rest[:next_h2.start()] if next_h2 else rest
+    lines = [l for l in section.splitlines() if _TABLE_ROW_RE.match(l)]
+    if len(lines) < 2:
+        return []
+    headers = [_clean_cell(c) for c in lines[0].strip("|").split("|")]
+    if not headers or headers[0].lower() != "version":
+        return []
+    keys = [h.lower() for h in headers]
+    rows = []
+    for line in lines[2:]:
+        if _TABLE_SEP_RE.match(line):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) != len(keys):
+            continue
+        rows.append({k: _clean_cell(c) for k, c in zip(keys, cells)})
+    return rows
+
+
+def _project_links(slug: str) -> list[str]:
+    """Related project slugs pulled from [[wikilink]] targets in idea.md and
+    tasks.md. The vault convention (see CLAUDE.md) is to link related projects
+    by slug — e.g. [[playground-game]] or [[cyber-deck-console/idea|Console]].
+    Only targets resolving to a real Projects/projects directory are kept;
+    links to non-project vault notes (e.g. [[Syncthing]]) are silently
+    dropped rather than guessed at."""
+    slugs: list[str] = []
+    for filename in ("idea.md", "tasks.md"):
+        f = PROJECTS_PATH / slug / filename
+        if not f.exists():
+            continue
+        content = frontmatter.load(f).content
+        for wm in _WIKILINK_RE.finditer(content):
+            candidate = wm.group(1).split("/")[0].split("#")[0].strip()
+            if candidate and candidate != slug and candidate not in slugs and (PROJECTS_PATH / candidate).is_dir():
+                slugs.append(candidate)
+    return slugs
+
+
+@app.get("/api/projects/index")
+def get_projects_index():
+    """Structured read of Projects/projects/index.md's category tables — the
+    vault's single declared source of truth for cross-project status, used by
+    workspace-sat's standalone overview page. Returns every row regardless of
+    status; Active/Planning/New/Idea filtering is a display concern (per
+    index.md's own note), not something this endpoint decides.
+    """
+    categories: list[dict] = []
+    if _INDEX_MD_PATH.exists():
+        content = frontmatter.load(_INDEX_MD_PATH).content
+        headings = list(_CATEGORY_H2_RE.finditer(content))
+        for i, h in enumerate(headings):
+            start = h.end()
+            end = headings[i + 1].start() if i + 1 < len(headings) else len(content)
+            rows = _parse_table_rows(content[start:end])
+            if not rows:
+                continue
+
+            projects = []
+            for name_raw, status_raw, next_action_raw, notes_raw in rows:
+                status_match = _STATUS_SPLIT_RE.match(status_raw.strip())
+                status_emoji, status_label = (
+                    (status_match.group(1), status_match.group(2))
+                    if status_match else ("", status_raw.strip())
+                )
+
+                # A Notes cell can have multiple backtick file-refs (e.g. a cross-link
+                # to another vault section before the project's own idea.md/tasks.md) —
+                # take the first one that's an actual Projects/projects slug, not just
+                # the first backtick span found.
+                slug = next(
+                    (c for c in _NOTES_SLUG_RE.findall(notes_raw) if (PROJECTS_PATH / c).is_dir()),
+                    None,
+                )
+
+                projects.append({
+                    "name": _clean_cell(name_raw),
+                    "status_emoji": status_emoji,
+                    "status_label": status_label,
+                    "next_action": _clean_cell(next_action_raw),
+                    "notes": _clean_cell(notes_raw),
+                    "slug": slug,
+                })
+
+            categories.append({"name": h.group(1).strip(), "projects": projects})
+
+    # Scoped CORS: workspace.station's standalone page fetches this cross-origin.
+    # A plain GET with default headers never triggers a preflight, so setting
+    # this response header alone is sufficient — no app-wide CORSMiddleware needed.
+    return Response(
+        content=json.dumps({"categories": categories}),
+        media_type="application/json",
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
+
 @app.get("/api/projects/{slug}")
 def get_project_tasks(slug: str):
     f = _project_working_file(slug)
     if not f:
         raise HTTPException(status_code=404, detail="Project not found")
     post = frontmatter.load(f)
-    return _project_payload(slug, f.name, post.content)
+    payload = _project_payload(slug, f.name, post.content)
+    # Scoped CORS: workspace.station's per-project page fetches this cross-origin,
+    # same reasoning as /api/projects/index. Harmless for the existing same-origin
+    # callers (hub proxy, knowledge.project-tasks widget).
+    return Response(
+        content=json.dumps(payload),
+        media_type="application/json",
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
 
 
 class CompleteTaskRequest(BaseModel):
@@ -982,6 +1151,145 @@ def vault_activity():
             continue
     results.sort(key=lambda x: x["modified"], reverse=True)
     return results[:30]
+
+
+# ── MCP (read-only pilot — see homeport vault agent-integration.md) ────────────
+# Resources wrap the same REST handlers above; no duplicated logic.
+
+mcp_server = FastMCP(
+    "obsidian",
+    streamable_http_path="/",
+    # No auth on any REST route here either — this satellite is internal-network-only,
+    # so DNS-rebinding host checks would just reject legitimate internal Host headers.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+
+@mcp_server.resource("obsidian://journal/today", mime_type="application/json")
+def mcp_journal_today() -> dict:
+    """Today's journal entry, if one exists."""
+    return get_today_journal()
+
+
+@mcp_server.resource("obsidian://reading/current", mime_type="application/json")
+def mcp_reading_current() -> dict:
+    """Currently-reading books plus read-by-year totals."""
+    return reading()
+
+
+@mcp_server.resource("obsidian://activity/recent", mime_type="application/json")
+def mcp_activity_recent() -> list[dict]:
+    """Vault notes modified in the last 7 days, most recent first."""
+    return vault_activity()
+
+
+@mcp_server.resource("obsidian://projects", mime_type="application/json")
+def mcp_projects() -> list[str]:
+    """Every project slug under Projects/projects/ in the vault."""
+    return list_project_slugs()
+
+
+@mcp_server.resource("obsidian://writing/projects", mime_type="application/json")
+def mcp_writing_projects() -> list[str]:
+    """Every writing project under Writing/Writing/ in the vault."""
+    return list_projects()
+
+
+def _task_text(slug: str, heading: str | None, index: int) -> str | None:
+    """Look up one task's display text by (heading, index) via the same
+    grouping the REST payload already exposes — avoids re-deriving the
+    line-offset regex logic in _find_task_line just to show a confirmation
+    message.
+
+    Calls _project_payload directly rather than the get_project_tasks route
+    function: that route now wraps its payload in a raw Response (for a
+    scoped CORS header), so calling it as a plain function no longer returns
+    a dict — _project_payload is the actual reusable data-only helper.
+    """
+    f = _project_working_file(slug)
+    if not f:
+        return None
+    post = frontmatter.load(f)
+    payload = _project_payload(slug, f.name, post.content)
+    for group in payload["tasks"]:
+        if group["heading"] == heading:
+            items = group["items"]
+            return items[index] if 0 <= index < len(items) else None
+    return None
+
+
+class TaskCompleteConfirmation(BaseModel):
+    confirm: bool = Field(description="Confirm marking this task complete")
+
+
+# First write tool exposed over MCP — see the write-tool safety policy in
+# homeport vault agent-integration.md: every mutating tool must (1) declare
+# destructiveHint/idempotentHint so any spec-compliant client knows it isn't
+# a plain read, and (2) call ctx.elicit(...) before mutating so the pause is
+# enforced by this satellite itself, not left to client-side judgment. Note
+# elicitation doesn't guarantee a *human* saw the prompt (an agent client is
+# free to auto-answer per the MCP spec) — the real backstop is that any
+# homeport-built client (the future agent-host-sat) always surfaces it.
+@mcp_server.tool(
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
+)
+async def mcp_complete_task(slug: str, index: int, ctx: Context, heading: str | None = None) -> dict:
+    """Mark one open task complete in a project's vault file (moves it from
+    ## Tasks into ## Completed). Requires user confirmation."""
+    task_text = _task_text(slug, heading, index)
+    if task_text is None:
+        raise ValueError(f"No task found at index {index} (heading={heading!r}) in project '{slug}'")
+
+    result = await ctx.elicit(
+        message=f'Mark task "{task_text}" complete in project "{slug}"?',
+        schema=TaskCompleteConfirmation,
+    )
+    if result.action != "accept" or not result.data.confirm:
+        return {"completed": False, "task": task_text, "action": result.action}
+
+    payload = complete_task(slug, CompleteTaskRequest(heading=heading, index=index))
+    return {"completed": True, "task": task_text, "project": payload}
+
+
+mcp_app = mcp_server.streamable_http_app()
+# CORS: browser-based MCP clients (e.g. MCP Inspector's web UI) connect directly
+# to this URL cross-origin, so the preflight OPTIONS request needs real CORS headers.
+mcp_app = CORSMiddleware(
+    mcp_app,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["mcp-session-id"],
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
+app.mount("/mcp", mcp_app)
+
+
+class _McpBareMount:
+    """Starlette's Mount only matches "/mcp/*" (it requires the trailing slash),
+    but MCP clients commonly POST to the bare "/mcp" path. Forward it explicitly
+    rather than relying on Starlette's redirect-slash fallback, which never
+    triggers here because the catch-all SPA route below produces a GET-only
+    partial match for "/mcp" first, winning as a 405 before the redirect check
+    runs. Must be a callable *instance*: Starlette treats plain functions as
+    request/response endpoints (defaulting to GET-only) rather than raw ASGI
+    apps, which would reintroduce the same bug."""
+
+    async def __call__(self, scope, receive, send):
+        scope = dict(scope)
+        scope["path"] = "/"
+        await mcp_app(scope, receive, send)
+
+
+app.router.routes.append(Route("/mcp", endpoint=_McpBareMount()))
 
 
 if STATIC_DIR.exists():

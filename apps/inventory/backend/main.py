@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -10,7 +10,11 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
+from starlette.routing import Route
 
 DB_PATH = Path(os.getenv("DB_PATH", "/data/inventory.db"))
 STATIC_DIR = Path(__file__).parent / "static"
@@ -194,6 +198,7 @@ def catalog():
         "provides": ["project"],
         "projectWidget": "inventory.project-items",
         "projectOrder": 20,
+        "mcp": {"url": "http://inventory:8080/mcp"},
     }
 
 
@@ -390,6 +395,77 @@ def delete_assignment(slug: str, assignment_id: str):
             "DELETE FROM item_assignments WHERE id = ? AND project_slug = ?",
             (assignment_id, slug),
         )
+
+
+# ── MCP (read-only — mirrors knowledge-sat, see homeport vault agent-integration.md) ──
+# Resources wrap the same REST handlers above; no duplicated logic.
+
+mcp_server = FastMCP(
+    "inventory",
+    streamable_http_path="/",
+    # No auth on any REST route here either — internal-network-only satellite.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+
+@mcp_server.resource("inventory://items/shopping-list", mime_type="application/json")
+def mcp_shopping_list() -> list[dict]:
+    """Items needing attention: low stock, ordered, depleted, or needed."""
+    return shopping_list()
+
+
+@mcp_server.resource("inventory://items/all", mime_type="application/json")
+def mcp_items_all() -> list[dict]:
+    """Every inventory item, unfiltered."""
+    return list_items()
+
+
+@mcp_server.resource("inventory://projects", mime_type="application/json")
+def mcp_projects() -> list[dict]:
+    """Projects with items currently assigned to them."""
+    return list_project_slugs()
+
+
+mcp_app = mcp_server.streamable_http_app()
+# CORS: browser-based MCP clients (e.g. MCP Inspector's web UI) connect directly
+# to this URL cross-origin, so the preflight OPTIONS request needs real CORS headers.
+mcp_app = CORSMiddleware(
+    mcp_app,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["mcp-session-id"],
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
+app.mount("/mcp", mcp_app)
+
+
+class _McpBareMount:
+    """Starlette's Mount only matches "/mcp/*" (it requires the trailing slash),
+    but MCP clients commonly POST to the bare "/mcp" path. Forward it explicitly
+    rather than relying on Starlette's redirect-slash fallback, which never
+    triggers here because the catch-all SPA route below produces a GET-only
+    partial match for "/mcp" first, winning as a 405 before the redirect check
+    runs. Must be a callable *instance*: Starlette treats plain functions as
+    request/response endpoints (defaulting to GET-only) rather than raw ASGI
+    apps, which would reintroduce the same bug. See
+    reference_mcp_streamable_http_fastapi_mount for the full writeup."""
+
+    async def __call__(self, scope, receive, send):
+        scope = dict(scope)
+        scope["path"] = "/"
+        await mcp_app(scope, receive, send)
+
+
+app.router.routes.append(Route("/mcp", endpoint=_McpBareMount()))
 
 
 # ── Static / SPA ──────────────────────────────────────────────────────────────

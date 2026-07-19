@@ -11,6 +11,7 @@ export default defineConfig({
       filename: 'remoteEntry.js',
       exposes: {
         './WorkspacePanelWidget': './src/widgets/WorkspacePanelWidget.entry',
+        './WorkspaceOverviewTeaserWidget': './src/widgets/WorkspaceOverviewTeaserWidget.entry',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },

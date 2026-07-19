@@ -94,6 +94,20 @@ Project identity lives in the Obsidian vault (`Projects/projects/<slug>/`), not 
 
 ---
 
+## MCP
+
+Exposes an MCP server (Streamable HTTP transport) at `/mcp` — read-only resources for now, wrapping the same handlers above (no duplicated logic).
+
+| Resource URI | Description |
+|---|---|
+| `inventory://items/shopping-list` | Items at/below threshold or ordered/depleted/needed |
+| `inventory://items/all` | Every item, unfiltered |
+| `inventory://projects` | Distinct project slugs with at least one assignment |
+
+See `docs/satellites/building-a-satellite.md`'s "Optional fields" section for the `mcp` catalog field, and `reference_mcp_streamable_http_fastapi_mount` for the Streamable HTTP mounting gotchas every satellite's `/mcp` has to work around.
+
+---
+
 ## Widgets
 
 | Widget id | Config | Description |

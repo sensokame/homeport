@@ -1,6 +1,6 @@
 import {
   Book, BookOpen, CheckSquare, Clock, Calendar, DollarSign, Server, Package,
-  Globe, Database, Folder, Settings, Activity, PenLine, type LucideProps,
+  Globe, Database, Folder, Settings, Activity, PenLine, LayoutDashboard, type LucideProps,
 } from 'lucide-react'
 
 type IconComponent = React.ComponentType<LucideProps>
@@ -20,6 +20,7 @@ const ICON_MAP: Record<string, IconComponent> = {
   'folder':       Folder,
   'settings':     Settings,
   'activity':     Activity,
+  'layout-dashboard': LayoutDashboard,
 }
 
 export function resolveIcon(name: string | undefined): React.ReactNode {

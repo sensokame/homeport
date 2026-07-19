@@ -3,6 +3,7 @@ import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import docker
@@ -10,6 +11,10 @@ import psutil
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.middleware.cors import CORSMiddleware
+from starlette.routing import Route
 
 STATIC_DIR = Path(__file__).parent / "static"
 OWN_NAME = os.getenv("CONTAINER_NAME", "infra")
@@ -122,11 +127,14 @@ def _compute_stats(c) -> dict | None:
 
 @app.get("/api/catalog")
 def catalog():
-    return {"widgets": [
-        {"id": "infra.overview", "name": "Infrastructure",
-         "description": "CPU, RAM, disk metrics and container status grouped by service group",
-         "configSchema": {}},
-    ]}
+    return {
+        "widgets": [
+            {"id": "infra.overview", "name": "Infrastructure",
+             "description": "CPU, RAM, disk metrics and container status grouped by service group",
+             "configSchema": {}},
+        ],
+        "mcp": {"url": "http://infra:8080/mcp"},
+    }
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -327,6 +335,71 @@ def update_all():
 @app.get("/api/actions/update-status")
 def update_status():
     return dict(_update_state)
+
+
+# ── MCP (read-only — mirrors knowledge-sat, see homeport vault agent-integration.md) ──
+# Resources wrap the same REST handlers above; no duplicated logic.
+
+mcp_server = FastMCP(
+    "infra",
+    streamable_http_path="/",
+    # No auth on any REST route here either — internal-network-only satellite.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+
+@mcp_server.resource("infra://containers", mime_type="application/json")
+def mcp_containers() -> list[dict]:
+    """Every known container's status, image, and service group."""
+    return list_containers()
+
+
+@mcp_server.resource("infra://system", mime_type="application/json")
+def mcp_system() -> dict:
+    """Current CPU/RAM/disk usage on the host."""
+    return system_stats()
+
+
+mcp_app = mcp_server.streamable_http_app()
+# CORS: browser-based MCP clients (e.g. MCP Inspector's web UI) connect directly
+# to this URL cross-origin, so the preflight OPTIONS request needs real CORS headers.
+mcp_app = CORSMiddleware(
+    mcp_app,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["mcp-session-id"],
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
+app.mount("/mcp", mcp_app)
+
+
+class _McpBareMount:
+    """Starlette's Mount only matches "/mcp/*" (it requires the trailing slash),
+    but MCP clients commonly POST to the bare "/mcp" path. Forward it explicitly
+    rather than relying on Starlette's redirect-slash fallback, which never
+    triggers here because the catch-all SPA route below produces a GET-only
+    partial match for "/mcp" first, winning as a 405 before the redirect check
+    runs. Must be a callable *instance*: Starlette treats plain functions as
+    request/response endpoints (defaulting to GET-only) rather than raw ASGI
+    apps, which would reintroduce the same bug. See
+    reference_mcp_streamable_http_fastapi_mount for the full writeup."""
+
+    async def __call__(self, scope, receive, send):
+        scope = dict(scope)
+        scope["path"] = "/"
+        await mcp_app(scope, receive, send)
+
+
+app.router.routes.append(Route("/mcp", endpoint=_McpBareMount()))
 
 
 # ── Static / SPA ──────────────────────────────────────────────────────────────

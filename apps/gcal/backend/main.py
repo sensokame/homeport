@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from contextlib import asynccontextmanager
 from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,7 +12,11 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from icalendar import Calendar
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
+from starlette.routing import Route
 
 STATIC_DIR = Path(__file__).parent / "static"
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
@@ -117,11 +122,14 @@ async def _fetch_events_today() -> list[dict]:
 
 @app.get("/api/catalog")
 def catalog():
-    return {"widgets": [
-        {"id": "calendar.overview", "name": "Calendar",
-         "description": "Current calendar block with one-click trade acknowledgment",
-         "configSchema": {}},
-    ]}
+    return {
+        "widgets": [
+            {"id": "calendar.overview", "name": "Calendar",
+             "description": "Current calendar block with one-click trade acknowledgment",
+             "configSchema": {}},
+        ],
+        "mcp": {"url": "http://gcal-sat:8080/mcp"},
+    }
 
 
 # ── Focus ─────────────────────────────────────────────────────────────────────
@@ -211,6 +219,74 @@ async def widget():
             }
 
     return {"configured": True, "current": current, "next": next_event}
+
+
+# ── MCP (read-only — mirrors knowledge-sat, see homeport vault agent-integration.md) ──
+# Resources wrap the same REST handlers above; no duplicated logic.
+
+mcp_server = FastMCP(
+    "gcal",
+    streamable_http_path="/",
+    # No auth on any REST route here either — internal-network-only satellite.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+
+@mcp_server.resource("gcal://focus/today", mime_type="application/json")
+def mcp_focus_today() -> dict:
+    """Weekly focus fields plus today's dated note from life/focus.md."""
+    return focus()
+
+
+@mcp_server.resource("gcal://events/today", mime_type="application/json")
+async def mcp_events_today() -> dict:
+    """Today's calendar events, with trade-acknowledgment flags."""
+    result = await events_today()
+    if isinstance(result, JSONResponse):
+        raise ValueError("GCAL_ICS_URL not configured")
+    return result
+
+
+mcp_app = mcp_server.streamable_http_app()
+# CORS: browser-based MCP clients (e.g. MCP Inspector's web UI) connect directly
+# to this URL cross-origin, so the preflight OPTIONS request needs real CORS headers.
+mcp_app = CORSMiddleware(
+    mcp_app,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["mcp-session-id"],
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
+app.mount("/mcp", mcp_app)
+
+
+class _McpBareMount:
+    """Starlette's Mount only matches "/mcp/*" (it requires the trailing slash),
+    but MCP clients commonly POST to the bare "/mcp" path. Forward it explicitly
+    rather than relying on Starlette's redirect-slash fallback — this satellite's
+    catch-all is a StaticFiles Mount("/", ...) rather than a Route, which is why
+    this /mcp mount+route is registered *before* it below: Starlette's Mount
+    matching doesn't filter by method, so a catch-all Mount registered first
+    would swallow every request path, /mcp included, regardless of method. Must
+    be a callable *instance* — see reference_mcp_streamable_http_fastapi_mount
+    for why a plain function would default to GET-only and reintroduce the bug."""
+
+    async def __call__(self, scope, receive, send):
+        scope = dict(scope)
+        scope["path"] = "/"
+        await mcp_app(scope, receive, send)
+
+
+app.router.routes.append(Route("/mcp", endpoint=_McpBareMount()))
 
 
 # ── Static ────────────────────────────────────────────────────────────────────

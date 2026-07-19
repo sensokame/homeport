@@ -10,4 +10,5 @@ export interface HubCatalog {
   satellites: Record<string, unknown[]>
   projectProviders?: Record<string, string> // satelliteId -> projectWidget id
   projectOrder?: Record<string, number>     // satelliteId -> display order (lower first)
+  mcp?: Record<string, { url: string }>     // satelliteId -> MCP server URL, for satellites that declare one
 }

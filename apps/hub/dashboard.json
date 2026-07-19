@@ -23,7 +23,7 @@
     },
     {
       "id": "workspace",
-      "url": "",
+      "url": "http://workspace.station",
       "widgetUrl": "http://workspace-sat:8080"
     }
   ],

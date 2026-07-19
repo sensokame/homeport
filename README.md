@@ -23,6 +23,7 @@ The hub reads `dashboard.json` and renders a configurable tab dashboard. Each sa
 | `apps/wger` | Fitness satellite — wraps wger; shows workout and nutrition status |
 | `apps/actual` | Budget satellite — wraps Actual Budget; shows monthly spend summary |
 | `apps/gcal` | Calendar satellite — ICS-based calendar; current block + trade acknowledgment |
+| `apps/mcp-gateway` | MCP Gateway satellite — discovery + aggregation for the agent access layer (no domain data of its own) |
 
 ## Packages
 

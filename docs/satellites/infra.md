@@ -64,6 +64,19 @@ Status logic: `ok` if all containers running, `error` if >20% stopped, `warn` ot
 
 ---
 
+## MCP
+
+Exposes an MCP server (Streamable HTTP transport) at `/mcp` — read-only resources, wrapping the same handlers above (no duplicated logic).
+
+| Resource URI | Description |
+|---|---|
+| `infra://containers` | Every known container's status, image, and service group |
+| `infra://system` | Current CPU/RAM/disk usage on the host |
+
+See `docs/satellites/building-a-satellite.md`'s "Optional fields" section for the `mcp` catalog field, and `reference_mcp_streamable_http_fastapi_mount` for the Streamable HTTP mounting gotchas every satellite's `/mcp` has to work around.
+
+---
+
 ## docker-compose.yml
 
 ```yaml

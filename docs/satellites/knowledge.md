@@ -96,6 +96,30 @@ Chapter status and session history are stored in a hidden per-project sidecar fi
 
 ---
 
+## MCP
+
+Exposes an MCP server (Streamable HTTP transport) at `/mcp` — the pilot for homeport's agent-access layer (see `agent-integration.md` in the Projects vault).
+
+**Resources** (read-only, wrap the same handlers above — no duplicated logic):
+
+| Resource URI | Description |
+|---|---|
+| `obsidian://journal/today` | Today's journal entry, if one exists |
+| `obsidian://reading/current` | Currently-reading books + read-by-year totals |
+| `obsidian://activity/recent` | Vault notes modified in the last 7 days, most recent first |
+| `obsidian://projects` | Every project slug under `Projects/projects/` |
+| `obsidian://writing/projects` | Every writing project under `Writing/Writing/` |
+
+**Tools** (mutating — first pilot of homeport's write-tool safety policy):
+
+| Tool | Description |
+|---|---|
+| `mcp_complete_task(slug, index, heading=None)` | Same effect as `POST /api/projects/{slug}/tasks/complete`. Declares `destructiveHint=True`/`idempotentHint=False` annotations, and calls `ctx.elicit(...)` to request explicit confirmation (showing the task's text) before mutating the vault file — the pause is enforced by this satellite's own tool handler, not left to client-side judgment. Note: MCP elicitation doesn't guarantee a *human* saw the prompt (a fully autonomous client is allowed to auto-answer per spec) — the real backstop is that any homeport-built client (the future `agent-host-sat`) always surfaces it. |
+
+See `reference_mcp_streamable_http_fastapi_mount` for the Streamable HTTP mounting gotchas this satellite's `/mcp` had to work around originally.
+
+---
+
 ## docker-compose.yml
 
 ```yaml

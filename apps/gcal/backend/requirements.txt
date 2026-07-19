@@ -3,3 +3,4 @@ uvicorn[standard]
 httpx
 icalendar
 recurring-ical-events
+mcp==1.28.1

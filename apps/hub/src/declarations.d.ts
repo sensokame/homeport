@@ -69,6 +69,12 @@ declare module 'workspace/WorkspacePanelWidget' {
   export default component
 }
 
+declare module 'workspace/WorkspaceOverviewTeaserWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}
+
 declare module 'wger/FitnessWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent

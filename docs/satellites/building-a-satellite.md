@@ -77,6 +77,13 @@ def catalog():
 
 `configSchema` uses the same format as `WidgetManifest.configSchema` in `@homeport/ui` — an object of `{ type, label, required? }` entries.
 
+#### Optional fields
+
+Satellites may add extra top-level keys to this response to opt into hub-level features. The hub only extracts fields it knows about — everything else is ignored, so this is safe to add incrementally. Existing examples:
+
+- `provides` / `projectWidget` / `projectOrder` — opts into "project mode" composition (see `workspace.md`)
+- `mcp: { "url": "http://<satellite>:8080/mcp" }` — declares an MCP server the satellite exposes (see `agent-integration.md` in the Projects vault). The hub aggregates these into a top-level `mcp: Record<satelliteId, { url }>` map on its own `/api/catalog` response. Not yet consumed by any agent host — declare it once your satellite actually mounts an `/mcp` endpoint.
+
 ### GET /assets/remoteEntry.js (served by Vite build)
 
 The module federation entry point. Vite generates this automatically from your `vite.config.ts`. The hub's backend proxies requests for it.

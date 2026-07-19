@@ -60,6 +60,19 @@ Widget response:
 
 ---
 
+## MCP
+
+Exposes an MCP server (Streamable HTTP transport) at `/mcp` — read-only resources, wrapping the same handlers above (no duplicated logic).
+
+| Resource URI | Description |
+|---|---|
+| `gcal://focus/today` | Weekly focus fields + today's dated note from `life/focus.md` |
+| `gcal://events/today` | Today's calendar events, with trade-acknowledgment flags |
+
+See `docs/satellites/building-a-satellite.md`'s "Optional fields" section for the `mcp` catalog field, and `reference_mcp_streamable_http_fastapi_mount` for the Streamable HTTP mounting gotchas every satellite's `/mcp` has to work around.
+
+---
+
 ## docker-compose.yml
 
 ```yaml

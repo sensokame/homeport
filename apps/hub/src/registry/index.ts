@@ -10,6 +10,7 @@ const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
 const KnowledgeProjectTasksWidget = lazy(() => import('knowledge/ProjectTasksWidget'))
 const WritingWidget          = lazy(() => import('knowledge/WritingWidget'))
 const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
+const WorkspaceOverviewTeaserWidget = lazy(() => import('workspace/WorkspaceOverviewTeaserWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
   'builtin.clock': {
@@ -69,6 +70,14 @@ export const registry: Record<string, WidgetManifest> = {
     },
     component: WorkspacePanelWidget,
     defaultIcon: 'folder',
+  },
+  'workspace.overview-teaser': {
+    id: 'workspace.overview-teaser',
+    name: 'Workspace Overview',
+    description: 'Link out to the full productivity-mode overview at workspace.station',
+    configSchema: {},
+    component: WorkspaceOverviewTeaserWidget,
+    defaultIcon: 'layout-dashboard',
   },
   'infra.overview': {
     id: 'infra.overview',

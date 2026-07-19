@@ -61,6 +61,7 @@ async def catalog():
     results = {}
     project_providers = {}
     project_order = {}
+    mcp_servers = {}
     async with httpx.AsyncClient(timeout=5.0) as client:
         for sat in data.get("satellites", []):
             widget_url = sat.get("widgetUrl")
@@ -74,6 +75,9 @@ async def catalog():
                 if "project" in payload.get("provides", []) and project_widget:
                     project_providers[sat["id"]] = project_widget
                     project_order[sat["id"]] = payload.get("projectOrder", 100)
+                mcp = payload.get("mcp")
+                if mcp and mcp.get("url"):
+                    mcp_servers[sat["id"]] = {"url": mcp["url"]}
             except Exception:
                 results[sat["id"]] = []
     builtins = [
@@ -85,6 +89,7 @@ async def catalog():
         "satellites": results,
         "projectProviders": project_providers,
         "projectOrder": project_order,
+        "mcp": mcp_servers,
     }
 
 
