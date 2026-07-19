@@ -7,6 +7,7 @@
 .title { font-size: var(--text-lg); font-weight: 700; margin: 0; }
 
 .description { font-size: var(--text-base); color: var(--color-text); margin: 0 0 var(--space-6) 0; }
+.activity { font-size: var(--text-sm); color: var(--color-muted); margin: 0 0 var(--space-6) 0; }
 .error { color: var(--color-error); font-size: var(--text-sm); margin: 0 0 var(--space-4) 0; }
 
 .section { margin-bottom: var(--space-7); }

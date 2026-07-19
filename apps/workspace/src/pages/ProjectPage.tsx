@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Badge } from '@homeport/ui'
-import type { ProjectDetail, ProjectEntry } from '../types'
+import type { DevSessionsSummary, ProjectDetail, ProjectEntry } from '../types'
 import { badgeVariant } from './projectStatus'
-import { getProjectDetail } from '../api'
+import { getProjectDetail, getDevSessions } from '../api'
 import { WORKSPACE_HASH_URL } from '../constants'
 import styles from './ProjectPage.module.css'
 
@@ -11,15 +11,28 @@ interface ProjectPageProps {
   slugIndex: Map<string, ProjectEntry>
 }
 
+function relativeTime(iso: string): string {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
 export default function ProjectPage({ entry, slugIndex }: ProjectPageProps) {
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [devSessions, setDevSessions] = useState<DevSessionsSummary | null>(null)
 
   useEffect(() => {
     setDetail(null)
     setError(null)
+    setDevSessions(null)
     if (!entry.slug) return
     getProjectDetail(entry.slug).then(setDetail).catch(e => setError(e.message))
+    // Best-effort — most projects have no dev-companion history, and that's
+    // not an error state, so failures here don't block the rest of the page.
+    getDevSessions(entry.slug).then(setDevSessions).catch(() => {})
   }, [entry.slug])
 
   const hasTasks = detail ? detail.tasks.some(g => g.items.length > 0) : false
@@ -38,6 +51,16 @@ export default function ProjectPage({ entry, slugIndex }: ProjectPageProps) {
 
       {(detail?.description || entry.notes) && (
         <p className={styles.description}>{detail?.description || entry.notes}</p>
+      )}
+
+      {devSessions && (devSessions.sessions.length > 0 || devSessions.open_session) && (
+        <p className={styles.activity}>
+          {devSessions.open_session
+            ? 'Session in progress'
+            : `Last worked ${relativeTime(devSessions.sessions[devSessions.sessions.length - 1].ended_at)}`}
+          {devSessions.current_streak_days > 0 &&
+            ` · ${devSessions.current_streak_days}-day streak`}
+        </p>
       )}
 
       {error && <p className={styles.error}>Couldn't load project detail ({error})</p>}

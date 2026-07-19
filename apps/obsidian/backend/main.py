@@ -1073,6 +1073,79 @@ def complete_task(slug: str, body: CompleteTaskRequest):
     return _project_payload(slug, f.name, content)
 
 
+# ── Dev sessions (dev-companion session tracking) ──────────────────────────────
+# Mirrors writing/music's "no new satellite, no new DB" pattern — a per-project
+# JSON sidecar, same shape as .writing-meta.json's sessions list. No progress/
+# curriculum field: task state already lives in the project's own idea.md/
+# tasks.md, parsed by /api/projects/{slug} above — a second progress model here
+# would just be a second source of truth for the same thing.
+
+def _dev_meta_path(slug: str) -> Path:
+    return PROJECTS_PATH / slug / ".dev-meta.json"
+
+
+def _load_dev_meta(slug: str) -> dict:
+    p = _dev_meta_path(slug)
+    if not p.exists():
+        return {"sessions": [], "open_session": None}
+    meta = json.loads(p.read_text())
+    meta.setdefault("sessions", [])
+    meta.setdefault("open_session", None)
+    return meta
+
+
+def _save_dev_meta(slug: str, meta: dict) -> None:
+    _dev_meta_path(slug).write_text(json.dumps(meta, indent=2))
+
+
+@app.post("/api/dev/projects/{slug}/sessions/start")
+def start_dev_session(slug: str):
+    if not (PROJECTS_PATH / slug).is_dir():
+        raise HTTPException(status_code=404, detail="Project not found")
+    meta = _load_dev_meta(slug)
+    if meta["open_session"] is not None:
+        raise HTTPException(status_code=409, detail="A session is already open")
+    meta["open_session"] = {"started_at": datetime.now(tz=timezone.utc).isoformat()}
+    _save_dev_meta(slug, meta)
+    return meta["open_session"]
+
+
+@app.post("/api/dev/projects/{slug}/sessions/end")
+def end_dev_session(slug: str):
+    meta = _load_dev_meta(slug)
+    open_session = meta["open_session"]
+    if open_session is None:
+        raise HTTPException(status_code=409, detail="No session is open")
+    ended_at = datetime.now(tz=timezone.utc)
+    started_at = datetime.fromisoformat(open_session["started_at"])
+    record = {
+        "started_at": open_session["started_at"],
+        "ended_at": ended_at.isoformat(),
+        "duration_seconds": int((ended_at - started_at).total_seconds()),
+    }
+    meta["sessions"].append(record)
+    meta["open_session"] = None
+    _save_dev_meta(slug, meta)
+    return record
+
+
+@app.get("/api/dev/projects/{slug}/sessions")
+def list_dev_sessions(slug: str):
+    meta = _load_dev_meta(slug)
+    payload = {
+        "sessions": meta["sessions"],
+        "open_session": meta["open_session"],
+        "current_streak_days": _current_streak_days(meta["sessions"]),
+    }
+    # Scoped CORS: workspace.station's project page fetches this cross-origin,
+    # same reasoning as /api/projects/{slug} above.
+    return Response(
+        content=json.dumps(payload),
+        media_type="application/json",
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
+
 # ── Journal ──────────────────────────────────────────────────────────────────
 
 JOURNAL_PATH = VAULT_PATH / "life" / "Journal"
