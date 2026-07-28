@@ -56,8 +56,9 @@
   border-top: 1px solid var(--color-border);
   margin-top: auto;
 }
-.logsLink { margin-left: auto; font-size: var(--text-sm); color: var(--color-link); text-decoration: none; }
-.logsLink:hover { text-decoration: underline; }
+.linkGroup { margin-left: auto; display: flex; gap: var(--space-3); }
+.logsLink, .openLink { font-size: var(--text-sm); color: var(--color-link); text-decoration: none; }
+.logsLink:hover, .openLink:hover { text-decoration: underline; }
 
 .muted { color: var(--color-muted); font-size: var(--text-base); }
 

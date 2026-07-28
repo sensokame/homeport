@@ -5,6 +5,7 @@ export interface Container {
   image: string
   started: string
   group: string
+  url: string
 }
 
 export interface ContainerDetail extends Container {

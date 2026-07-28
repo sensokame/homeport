@@ -99,6 +99,7 @@ def _container_info(c) -> dict:
         "image": c.image.tags[0] if c.image.tags else c.image.short_id,
         "started": c.attrs["State"]["StartedAt"],
         "group": labels.get("homeport.group", ""),
+        "url": labels.get("homeport.url", ""),
     }
 
 

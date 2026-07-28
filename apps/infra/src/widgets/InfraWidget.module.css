@@ -83,6 +83,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+
+.openLink {
+  color: var(--color-link);
+  text-decoration: none;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+}
+
+.openLink:hover {
+  text-decoration: underline;
 }
 
 .dot {

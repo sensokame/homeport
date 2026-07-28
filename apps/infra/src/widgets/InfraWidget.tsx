@@ -5,7 +5,7 @@ import styles from './InfraWidget.module.css'
 
 interface Metric { label: string; value: string; alert?: boolean }
 interface WidgetData { summary: string; metrics: Metric[] }
-interface Container { name: string; status: string; group: string }
+interface Container { name: string; status: string; group: string; url: string }
 
 const GROUP_ORDER = ['internal', 'orchestrator', 'public']
 
@@ -37,6 +37,10 @@ function GroupPanel({ group, containers }: { group: string; containers: Containe
         {containers.map(c => (
           <div key={c.name} className={styles.containerRow}>
             <span className={styles.containerName}>{c.name}</span>
+            {c.url && (
+              <a className={styles.openLink} href={c.url} target="_blank" rel="noopener"
+                onClick={e => e.stopPropagation()}>open →</a>
+            )}
             <span className={[styles.dot, c.status === 'running' ? styles.dotRunning : styles.dotStopped].join(' ')} />
           </div>
         ))}

@@ -172,8 +172,15 @@ export default function Overview({ config }: OverviewProps) {
           ) : (
             <Button size="sm" onClick={() => handleAction(c.name, 'start')}>start</Button>
           )}
-          {dozzleHref && (
-            <a className={styles.logsLink} href={dozzleHref} target="_blank" rel="noopener">logs →</a>
+          {(dozzleHref || c.url) && (
+            <div className={styles.linkGroup}>
+              {c.url && (
+                <a className={styles.openLink} href={c.url} target="_blank" rel="noopener">open →</a>
+              )}
+              {dozzleHref && (
+                <a className={styles.logsLink} href={dozzleHref} target="_blank" rel="noopener">logs →</a>
+              )}
+            </div>
           )}
         </div>
       </Card>
