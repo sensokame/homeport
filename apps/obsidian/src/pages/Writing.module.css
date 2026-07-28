@@ -162,6 +162,13 @@
   color: var(--color-muted);
   cursor: pointer;
   white-space: nowrap;
+  padding-top: var(--space-3);
+}
+
+.countLabel {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  white-space: nowrap;
 }
 
 .overlay {

@@ -77,6 +77,9 @@ function ExportDialog({ project, chapters, onClose }: {
     })
   }
 
+  const wordCount = (advanced ? chapters.filter(c => selected.has(c.stem)) : chapters)
+    .reduce((sum, c) => sum + c.word_count, 0)
+
   async function handleExport() {
     setExporting(true)
     try {
@@ -98,9 +101,11 @@ function ExportDialog({ project, chapters, onClose }: {
       <div className={styles.dialog}>
         <p className={styles.dialogTitle}>Export PDF</p>
 
-        {!advanced
-          ? <button className={styles.advancedToggle} onClick={() => setAdvanced(true)}>Advanced ▸</button>
-          : (
+        <button className={styles.advancedToggle} onClick={() => setAdvanced(a => !a)}>
+          Advanced {advanced ? '▾' : '▸'}
+        </button>
+        {advanced && (
+          <>
             <div className={styles.exportChapterList}>
               {chapters.map(c => (
                 <label key={c.stem} className={styles.exportChapterRow}>
@@ -109,19 +114,21 @@ function ExportDialog({ project, chapters, onClose }: {
                 </label>
               ))}
             </div>
-          )}
-
-        <div className={styles.exportActions}>
-          <button className={styles.cancelBtn} onClick={onClose} disabled={exporting}>Cancel</button>
-          <div className={styles.exportActionsRight}>
             <label className={styles.countToggle}>
               <input
                 type="checkbox"
                 checked={includeCounts}
                 onChange={e => setIncludeCounts(e.target.checked)}
               />
-              Page &amp; word count
+              Include page &amp; word count in PDF header
             </label>
+          </>
+        )}
+
+        <div className={styles.exportActions}>
+          <button className={styles.cancelBtn} onClick={onClose} disabled={exporting}>Cancel</button>
+          <div className={styles.exportActionsRight}>
+            <span className={styles.countLabel}>{wordCount.toLocaleString()} words</span>
             <button
               className={styles.confirmBtn}
               onClick={handleExport}

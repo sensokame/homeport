@@ -641,8 +641,9 @@ class ProjectExportRequest(BaseModel):
     include_counts: bool = False
 
 
-def _build_export_html(files: list[Path], project_label: str, meta_line: str | None) -> str:
-    kicker = f'<p class="project-name">{project_label}</p>'
+def _build_export_html(files: list[Path], project_label: str, meta_line: str | None, is_excerpt: bool = False) -> str:
+    label = f"{project_label} &middot; Excerpt" if is_excerpt else project_label
+    kicker = f'<p class="project-name">{label}</p>'
     meta = f'<div class="export-meta">{meta_line}</div>' if meta_line else ""
     parts = []
     for i, f in enumerate(files):
@@ -653,26 +654,37 @@ def _build_export_html(files: list[Path], project_label: str, meta_line: str | N
     return f"<html><head><style>{_PDF_CSS}</style></head><body>{header}{''.join(parts)}</body></html>"
 
 
-@app.post("/api/writing/projects/{name}/export.pdf")
-def export_project_pdf(name: str, body: ProjectExportRequest | None = None):
+def _resolve_export_files(name: str, stems: list[str] | None) -> tuple[list[Path], bool]:
     files = _content_files(name)
     if not files:
         raise HTTPException(status_code=404, detail="No chapters to export")
-    if body and body.stems:
-        wanted = set(body.stems)
+    total_files = len(files)
+    if stems:
+        wanted = set(stems)
         files = [f for f in files if f.stem in wanted]
         if not files:
             raise HTTPException(status_code=404, detail="No matching chapters")
+    return files, len(files) < total_files
+
+
+def _compute_counts(files: list[Path], project_label: str, is_excerpt: bool) -> tuple[int, int]:
+    word_count = sum(_word_count(f.read_text()) for f in files)
+    draft_html = _build_export_html(files, project_label, None, is_excerpt)
+    page_count = len(HTML(string=draft_html).render().pages)
+    return page_count, word_count
+
+
+@app.post("/api/writing/projects/{name}/export.pdf")
+def export_project_pdf(name: str, body: ProjectExportRequest | None = None):
+    files, is_excerpt = _resolve_export_files(name, body.stems if body else None)
     project_label = name.replace("-", " ").replace("_", " ").title()
 
     meta_line = None
     if body and body.include_counts:
-        word_count = sum(_word_count(f.read_text()) for f in files)
-        draft_html = _build_export_html(files, project_label, None)
-        page_count = len(HTML(string=draft_html).render().pages)
+        page_count, word_count = _compute_counts(files, project_label, is_excerpt)
         meta_line = f"{page_count} pages &middot; {word_count:,} words"
 
-    html = _build_export_html(files, project_label, meta_line)
+    html = _build_export_html(files, project_label, meta_line, is_excerpt)
     buf = BytesIO()
     HTML(string=html).write_pdf(target=buf)
     return Response(
