@@ -77,6 +77,21 @@ export function chapterExportUrl(project: string, chapter: string): string {
   return `/api/writing/projects/${encodeURIComponent(project)}/chapters/${encodeURIComponent(chapter)}/export.pdf`
 }
 
+export async function exportProjectPdf(project: string, stems?: string[], includeCounts?: boolean): Promise<void> {
+  const r = await fetch(`/api/writing/projects/${encodeURIComponent(project)}/export.pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stems: stems ?? null, include_counts: !!includeCounts }),
+  })
+  const blob = await r.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${project}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function createChapter(project: string, title: string): Promise<void> {
   await fetch(`/api/writing/projects/${encodeURIComponent(project)}/chapters`, {
     method: 'POST',

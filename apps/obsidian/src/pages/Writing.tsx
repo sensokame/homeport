@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
-import { fetchProjects, fetchProject, fetchCharacters, createCharacter, fetchChapters, fetchChapterContent, chapterExportUrl, createChapter, createProject } from '../api'
+import { fetchProjects, fetchProject, fetchCharacters, createCharacter, fetchChapters, fetchChapterContent, chapterExportUrl, exportProjectPdf, createChapter, createProject } from '../api'
 import type { WritingProject, Chapter } from '../types'
 import styles from './Writing.module.css'
 
@@ -52,6 +52,84 @@ function CreateDialog({ title, placeholder, onConfirm, onClose }: {
           <button className={styles.confirmBtn} onClick={handleConfirm} disabled={saving || !value.trim()}>
             {saving ? 'Creating…' : 'Confirm'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExportDialog({ project, chapters, onClose }: {
+  project: string
+  chapters: Chapter[]
+  onClose: () => void
+}) {
+  const [advanced, setAdvanced] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(chapters.map(c => c.stem)))
+  const [includeCounts, setIncludeCounts] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  function toggle(stem: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(stem)) next.delete(stem)
+      else next.add(stem)
+      return next
+    })
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const allSelected = selected.size === chapters.length
+      await exportProjectPdf(project, advanced && !allSelected ? Array.from(selected) : undefined, includeCounts)
+      onClose()
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const allSelected = selected.size === chapters.length
+  const label = !advanced || allSelected
+    ? 'Export book'
+    : `Export ${selected.size} chapter${selected.size === 1 ? '' : 's'}`
+
+  return (
+    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className={styles.dialog}>
+        <p className={styles.dialogTitle}>Export PDF</p>
+
+        {!advanced
+          ? <button className={styles.advancedToggle} onClick={() => setAdvanced(true)}>Advanced ▸</button>
+          : (
+            <div className={styles.exportChapterList}>
+              {chapters.map(c => (
+                <label key={c.stem} className={styles.exportChapterRow}>
+                  <input type="checkbox" checked={selected.has(c.stem)} onChange={() => toggle(c.stem)} />
+                  <span>{chapterDisplayName(c.stem)}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+        <div className={styles.exportActions}>
+          <button className={styles.cancelBtn} onClick={onClose} disabled={exporting}>Cancel</button>
+          <div className={styles.exportActionsRight}>
+            <label className={styles.countToggle}>
+              <input
+                type="checkbox"
+                checked={includeCounts}
+                onChange={e => setIncludeCounts(e.target.checked)}
+              />
+              Page &amp; word count
+            </label>
+            <button
+              className={styles.confirmBtn}
+              onClick={handleExport}
+              disabled={exporting || (advanced && selected.size === 0)}
+            >
+              {exporting ? 'Exporting…' : label}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -118,9 +196,11 @@ function ProjectDetail({ name, initialChapter, onBack }: { name: string; initial
   const [characters, setCharacters] = useState<string[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [dialog, setDialog] = useState<'character' | 'chapter' | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   const [selectedChapter, setSelectedChapter] = useState<string | null>(initialChapter ?? null)
 
   useEffect(() => { fetchProject(name).then(setProject) }, [name])
+  useEffect(() => { fetchChapters(name).then(setChapters) }, [name])
 
   useEffect(() => {
     if (initialChapter) {
@@ -138,7 +218,6 @@ function ProjectDetail({ name, initialChapter, onBack }: { name: string; initial
 
   useEffect(() => {
     if (tab === 'characters') fetchCharacters(name).then(setCharacters)
-    if (tab === 'chapters') fetchChapters(name).then(setChapters)
   }, [tab, name])
 
   async function handleCreateCharacter(charName: string) {
@@ -182,11 +261,19 @@ function ProjectDetail({ name, initialChapter, onBack }: { name: string; initial
           onClose={() => setDialog(null)}
         />
       )}
+      {exportOpen && (
+        <ExportDialog project={name} chapters={chapters} onClose={() => setExportOpen(false)} />
+      )}
 
       <button className={styles.backBtn} onClick={onBack}>← All projects</button>
       <div className={styles.sectionHeader}>
         <h1 className={styles.heading}>{displayName}</h1>
-        {tabNewBtn[tab]}
+        <div className={styles.headerActions}>
+          <button className={styles.newBtn} onClick={() => setExportOpen(true)} disabled={chapters.length === 0}>
+            Export PDF
+          </button>
+          {tabNewBtn[tab]}
+        </div>
       </div>
 
       <div className={styles.tabs}>

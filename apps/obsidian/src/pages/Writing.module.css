@@ -99,6 +99,70 @@
 }
 
 .newBtn:hover { border-color: var(--color-link); }
+.newBtn:disabled { opacity: 0.5; cursor: default; }
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.advancedToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.advancedToggle:hover { color: var(--color-text); }
+
+.exportChapterList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3) 0;
+}
+
+.exportChapterRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.exportActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.exportActionsRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.countToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
 
 .overlay {
   position: fixed;

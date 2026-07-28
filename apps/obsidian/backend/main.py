@@ -330,6 +330,15 @@ body {
     margin: 0 0 6pt 0;
     text-indent: 0;
 }
+.export-header { position: relative; }
+.export-meta {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 8pt;
+    color: #999;
+    letter-spacing: 0.03em;
+}
 h1 {
     font-size: 17pt;
     font-weight: 700;
@@ -624,6 +633,52 @@ def export_chapter_pdf(name: str, chapter: str):
         content=buf.getvalue(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class ProjectExportRequest(BaseModel):
+    stems: list[str] | None = None
+    include_counts: bool = False
+
+
+def _build_export_html(files: list[Path], project_label: str, meta_line: str | None) -> str:
+    kicker = f'<p class="project-name">{project_label}</p>'
+    meta = f'<div class="export-meta">{meta_line}</div>' if meta_line else ""
+    parts = []
+    for i, f in enumerate(files):
+        html_body = md_parser.markdown(f.read_text(), extensions=["extra", "smarty"])
+        style = ' style="break-before: page;"' if i > 0 else ""
+        parts.append(f"<div{style}>{html_body}</div>")
+    header = f'<div class="export-header">{meta}{kicker}</div>'
+    return f"<html><head><style>{_PDF_CSS}</style></head><body>{header}{''.join(parts)}</body></html>"
+
+
+@app.post("/api/writing/projects/{name}/export.pdf")
+def export_project_pdf(name: str, body: ProjectExportRequest | None = None):
+    files = _content_files(name)
+    if not files:
+        raise HTTPException(status_code=404, detail="No chapters to export")
+    if body and body.stems:
+        wanted = set(body.stems)
+        files = [f for f in files if f.stem in wanted]
+        if not files:
+            raise HTTPException(status_code=404, detail="No matching chapters")
+    project_label = name.replace("-", " ").replace("_", " ").title()
+
+    meta_line = None
+    if body and body.include_counts:
+        word_count = sum(_word_count(f.read_text()) for f in files)
+        draft_html = _build_export_html(files, project_label, None)
+        page_count = len(HTML(string=draft_html).render().pages)
+        meta_line = f"{page_count} pages &middot; {word_count:,} words"
+
+    html = _build_export_html(files, project_label, meta_line)
+    buf = BytesIO()
+    HTML(string=html).write_pdf(target=buf)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'},
     )
 
 
