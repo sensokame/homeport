@@ -48,21 +48,19 @@
           "widgetId": "infra.overview",
           "satelliteId": "infra",
           "config": {}
-        },
+        }
+      ]
+    },
+    {
+      "id": "knowledge",
+      "label": "Knowledge",
+      "widgets": [
         {
           "instanceId": "knowledge-main",
           "widgetId": "knowledge.reading",
           "satelliteId": "knowledge",
           "config": {
             "icon": "book-open"
-          }
-        },
-        {
-          "instanceId": "knowledge-writing",
-          "widgetId": "knowledge.writing",
-          "satelliteId": "knowledge",
-          "config": {
-            "icon": "pen-line"
           }
         },
         {
@@ -77,7 +75,7 @@
     },
     {
       "id": "focus-1780841652310",
-      "label": "productivity",
+      "label": "Productivity",
       "widgets": [
         {
           "instanceId": "inventory-main",
@@ -85,6 +83,22 @@
           "satelliteId": "inventory",
           "config": {
             "icon": "package"
+          }
+        },
+        {
+          "instanceId": "knowledge-writing",
+          "widgetId": "knowledge.writing",
+          "satelliteId": "knowledge",
+          "config": {
+            "icon": "pen-line"
+          }
+        },
+        {
+          "instanceId": "knowledge-dev",
+          "widgetId": "knowledge.dev",
+          "satelliteId": "knowledge",
+          "config": {
+            "icon": "activity"
           }
         },
         {

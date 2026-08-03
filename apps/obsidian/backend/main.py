@@ -201,6 +201,9 @@ def catalog():
             {"id": "knowledge.music", "name": "Music",
              "description": "Practice log, theory curriculum, and ear-training/scales/sight-reading progress",
              "configSchema": {}},
+            {"id": "knowledge.dev", "name": "Dev",
+             "description": "Recently worked-on projects with dev-companion session streaks",
+             "configSchema": {}},
         ],
         "provides": ["project"],
         "projectWidget": "knowledge.project-tasks",
@@ -1211,6 +1214,35 @@ def list_dev_sessions(slug: str):
         media_type="application/json",
         headers={"Access-Control-Allow-Origin": "*"},
     )
+
+
+@app.get("/api/dev/projects")
+def list_dev_projects():
+    # Aggregate across every project directory that has a .dev-meta.json
+    # sidecar. Only consumed by the hub's DevWidget via the server-side proxy,
+    # so unlike the {slug}/sessions endpoint above, no CORS header is needed.
+    if not PROJECTS_PATH.exists():
+        return []
+    results = []
+    for d in sorted(PROJECTS_PATH.iterdir()):
+        if not d.is_dir() or d.name.startswith("_") or d.name.startswith("."):
+            continue
+        if not (d / ".dev-meta.json").exists():
+            continue
+        meta = _load_dev_meta(d.name)
+        sessions = meta["sessions"]
+        open_session = meta["open_session"]
+        last_worked = open_session["started_at"] if open_session else (
+            sessions[-1]["ended_at"] if sessions else None
+        )
+        results.append({
+            "slug": d.name,
+            "open_session": open_session,
+            "last_worked": last_worked,
+            "current_streak_days": _current_streak_days(sessions),
+        })
+    results.sort(key=lambda r: r["last_worked"] or "", reverse=True)
+    return results
 
 
 # ── Journal ──────────────────────────────────────────────────────────────────

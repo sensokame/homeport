@@ -6,7 +6,7 @@ The hub is the entry point to homeport. It reads `dashboard.json`, proxies satel
 
 ## dashboard.json
 
-Mount this file into the container. Edit it without rebuilding. Changes to tabs and widget instances can also be made via the settings drawer in the UI (⚙ button in the tab bar) — they are saved back to the file automatically.
+Mount this file into the container. Edit it without rebuilding. Changes to tabs and widget instances can also be made via the settings drawer in the UI (⚙ button in the tab bar) — they are saved back to the file automatically. Widgets can be dragged to reorder within a tab or moved across tabs; whole tabs can be dragged by the ⠿ handle next to their name to reorder them.
 
 ```json
 {

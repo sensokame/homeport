@@ -8,6 +8,7 @@ Docker container monitoring. Exposes live container status, system metrics, and 
 
 - Container card grid — status, image, uptime, CPU, RAM per container
 - Container detail view — ports, mounts, networks, live stats, Dozzle log link
+- **Open →** link per container (card grid and hub widget) when it declares a `homeport.url` compose label
 - System metrics bar — CPU%, RAM, disk usage
 - Actions: stop, start, restart, **redeploy** per container
 - Group actions: restart, stop, start, **redeploy** per section (Orchestrators / Public / Internal)
@@ -43,6 +44,15 @@ Status logic: `ok` if all containers running, `error` if >20% stopped, `warn` ot
 | `CONTAINER_NAME` | `infra` | This container's name — excluded from restart-all and update-all |
 | `DOZZLE_URL` | _(empty)_ | Base URL of your Dozzle instance for log links |
 | `HOSTNAME_DISPLAY` | system hostname | Label shown in the top bar |
+
+---
+
+## Container labels
+
+| Label | Description |
+|---|---|
+| `homeport.group` | Groups containers under Orchestrators / Public / Internal |
+| `homeport.url` | Public URL shown as an **open →** link on the container's card and the hub's Infrastructure widget row. Omit to hide the link. Declarative — read straight from the label, no NPM API lookup or hostname-matching heuristic |
 
 ---
 

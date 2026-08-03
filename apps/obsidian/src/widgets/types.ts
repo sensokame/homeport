@@ -103,3 +103,14 @@ export interface MusicOverview {
   last_session: MusicSession | null
   open_session: OpenMusicSession | null
 }
+
+export interface OpenDevSession {
+  started_at: string
+}
+
+export interface DevProjectSummary {
+  slug: string
+  open_session: OpenDevSession | null
+  last_worked: string | null
+  current_streak_days: number
+}

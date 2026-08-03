@@ -23,6 +23,11 @@ interface DragState {
   overIndex: number  // equals tab.widgets.length for the append zone
 }
 
+interface TabDragState {
+  fromIndex: number
+  overIndex: number
+}
+
 interface SettingsDrawerProps {
   open: boolean
   onClose: () => void
@@ -34,11 +39,12 @@ interface SettingsDrawerProps {
   onDeleteTab: (tabId: string) => void
   onAddWidget: (tabId: string, widgetId: string, satelliteId?: string) => void
   onDropWidget: (fromTabId: string, fromIndex: number, toTabId: string, toIndex: number) => void
+  onReorderTabs: (fromIndex: number, toIndex: number) => void
 }
 
 export function SettingsDrawer({
   open, onClose, tabs, registry,
-  onRemoveWidget, onAddTab, onRenameTab, onDeleteTab, onAddWidget, onDropWidget,
+  onRemoveWidget, onAddTab, onRenameTab, onDeleteTab, onAddWidget, onDropWidget, onReorderTabs,
 }: SettingsDrawerProps) {
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -46,6 +52,7 @@ export function SettingsDrawer({
   const [addTabValue, setAddTabValue] = useState('')
   const [catalogTabId, setCatalogTabId] = useState<string | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [tabDragState, setTabDragState] = useState<TabDragState | null>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   if (!open) return null
@@ -96,12 +103,29 @@ export function SettingsDrawer({
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close settings">✕</button>
         </div>
         <div className={styles.body}>
-          {tabs.map(tab => {
+          {tabs.map((tab, tabIndex) => {
             const isDropTarget = isDragging && dragState.overTabId === tab.id
+            const isTabDropTarget = tabDragState !== null && tabDragState.overIndex === tabIndex && tabDragState.fromIndex !== tabIndex
             return (
               <section
                 key={tab.id}
-                className={[styles.section, isDropTarget && dragState.fromTabId !== tab.id ? styles.sectionDropTarget : ''].filter(Boolean).join(' ')}
+                className={[
+                  styles.section,
+                  isDropTarget && dragState.fromTabId !== tab.id ? styles.sectionDropTarget : '',
+                  isTabDropTarget ? styles.sectionDropTarget : '',
+                  tabDragState?.fromIndex === tabIndex ? styles.itemDragging : '',
+                ].filter(Boolean).join(' ')}
+                onDragOver={e => {
+                  if (!tabDragState) return
+                  e.preventDefault()
+                  setTabDragState(prev => prev ? { ...prev, overIndex: tabIndex } : null)
+                }}
+                onDrop={e => {
+                  if (!tabDragState) return
+                  e.preventDefault()
+                  onReorderTabs(tabDragState.fromIndex, tabIndex)
+                  setTabDragState(null)
+                }}
               >
                 {renamingTabId === tab.id ? (
                   <div className={styles.renameRow}>
@@ -120,7 +144,19 @@ export function SettingsDrawer({
                   </div>
                 ) : (
                   <div className={styles.tabHeader}>
-                    <h3 className={styles.sectionTitle}>{tab.label}</h3>
+                    <div className={styles.tabTitleRow}>
+                      <span
+                        className={styles.tabDragHandle}
+                        aria-hidden
+                        draggable
+                        onDragStart={e => {
+                          e.stopPropagation()
+                          setTabDragState({ fromIndex: tabIndex, overIndex: tabIndex })
+                        }}
+                        onDragEnd={() => setTabDragState(null)}
+                      >⠿</span>
+                      <h3 className={styles.sectionTitle}>{tab.label}</h3>
+                    </div>
                     <div className={styles.tabActions}>
                       <button className={styles.tabAction} onClick={() => startRename(tab)}>Rename</button>
                       {tabs.length > 1 && (
@@ -154,11 +190,13 @@ export function SettingsDrawer({
                           draggable
                           onDragStart={() => setDragState({ fromTabId: tab.id, fromIndex: idx, overTabId: tab.id, overIndex: idx })}
                           onDragOver={e => {
+                            if (!dragState) return
                             e.preventDefault()
                             e.stopPropagation()
-                            if (dragState) setDragState(prev => prev ? { ...prev, overTabId: tab.id, overIndex: idx } : null)
+                            setDragState(prev => prev ? { ...prev, overTabId: tab.id, overIndex: idx } : null)
                           }}
                           onDrop={e => {
+                            if (!dragState) return
                             e.preventDefault()
                             e.stopPropagation()
                             commitDrop(tab.id, idx)

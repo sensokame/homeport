@@ -10,6 +10,7 @@ const ReadingWidget          = lazy(() => import('knowledge/ReadingWidget'))
 const KnowledgeProjectTasksWidget = lazy(() => import('knowledge/ProjectTasksWidget'))
 const WritingWidget          = lazy(() => import('knowledge/WritingWidget'))
 const MusicWidget            = lazy(() => import('knowledge/MusicWidget'))
+const DevWidget               = lazy(() => import('knowledge/DevWidget'))
 const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
 const WorkspaceOverviewTeaserWidget = lazy(() => import('workspace/WorkspaceOverviewTeaserWidget'))
 
@@ -71,6 +72,14 @@ export const registry: Record<string, WidgetManifest> = {
     component: MusicWidget,
     defaultIcon: 'music',
     defaultOpenPath: '/#/music',
+  },
+  'knowledge.dev': {
+    id: 'knowledge.dev',
+    name: 'Dev',
+    description: 'Recently worked-on projects with dev-companion session streaks',
+    configSchema: {},
+    component: DevWidget,
+    defaultIcon: 'activity',
   },
   'workspace.panel': {
     id: 'workspace.panel',

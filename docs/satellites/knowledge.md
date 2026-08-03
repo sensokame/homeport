@@ -39,6 +39,7 @@ Status is always `ok` — the satellite is read-only and degrades gracefully.
 | `knowledge.reading` | none | Currently-reading books, card + focus session mode |
 | `knowledge.project-tasks` | `project_slug` (required) | Open task checklist + collapsible rendered notes for one project — designed to be embedded by [workspace-sat](workspace.md) in project mode, not added directly to a dashboard tab |
 | `knowledge.writing` | none | Writing projects with chapter status, word counts, and streaks; card + focus session mode (start/end tracked writing sessions) |
+| `knowledge.dev` | none | Recently worked-on projects (any project with dev-companion session history) with last-worked time and streak; each row links to the project's live workspace focus view |
 
 ---
 
@@ -91,8 +92,21 @@ Reads the project's working file — `tasks.md` if present, else `idea.md` (the 
 | `POST /api/writing/projects/{name}/sessions/start` | Snapshots current word count; 409 if a session is already open |
 | `POST /api/writing/projects/{name}/sessions/end` | Computes word delta + duration from the open session, appends it to the log; 409 if none is open |
 | `GET /api/writing/projects/{name}/sessions` | Closed session history + the current `open_session` if any |
+| `GET /api/writing/projects/{name}/chapters/{chapter}/export.pdf` | Single-chapter PDF export |
+| `POST /api/writing/projects/{name}/export.pdf` | Project-level PDF export. Body: `{stems: string[] \| null, include_counts: bool}` — `stems` omitted/null exports every chapter in canonical order, a subset exports only those (an excerpt, flagged as such in the PDF header). `include_counts` bakes a page/word-count annotation near the title, computed via a real WeasyPrint render pass (not an estimate) |
 
-Chapter status and session history are stored in a hidden per-project sidecar file, `<project>/.writing-meta.json`, inside the vault — no separate database. Prose chapter files are never touched by this feature (status lives in the sidecar, not chapter frontmatter).
+Chapter status and session history are stored in a hidden per-project sidecar file, `<project>/.writing-meta.json`, inside the vault — no separate database. Prose chapter files are never touched by this feature (status lives in the sidecar, not chapter frontmatter). Both PDF export routes reuse the same markdown → HTML → WeasyPrint pipeline; the project-level export adds a `break-before: page` div between chapters.
+
+### Dev companion (v1.8.0)
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/dev/projects/{slug}/sessions/start` | 409 if a session is already open |
+| `POST /api/dev/projects/{slug}/sessions/end` | Computes duration from the open session, appends it to the log; 409 if none is open |
+| `GET /api/dev/projects/{slug}/sessions` | Closed session history + `open_session` + `current_streak_days` for one project |
+| `GET /api/dev/projects` | Aggregates every project directory with a `.dev-meta.json` sidecar into `{slug, open_session, last_worked, current_streak_days}`, sorted most-recent-first — powers the `knowledge.dev` hub widget |
+
+Session data lives in the same per-project sidecar pattern as writing/music (`<project>/.dev-meta.json`), duration-only — no progress/curriculum field, since task state already lives in the project's own `idea.md`/`tasks.md`. Driven by the `/dev-companion` skill (session start/end), not manual UI controls, so the widget itself is read-only.
 
 ---
 

@@ -216,6 +216,15 @@ export default function App() {
     })
   }
 
+  async function handleReorderTabs(fromIndex: number, toIndex: number) {
+    if (!dashboard || fromIndex === toIndex) return
+    const tabs = [...dashboard.tabs]
+    const [moved] = tabs.splice(fromIndex, 1)
+    const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+    tabs.splice(insertAt, 0, moved)
+    await saveDashboard({ ...dashboard, tabs })
+  }
+
   async function handleDropWidget(fromTabId: string, fromIndex: number, toTabId: string, toIndex: number) {
     if (!dashboard) return
     const fromTab = dashboard.tabs.find(t => t.id === fromTabId)
@@ -392,6 +401,7 @@ export default function App() {
           onDeleteTab={handleDeleteTab}
           onAddWidget={handleAddWidget}
           onDropWidget={handleDropWidget}
+          onReorderTabs={handleReorderTabs}
         />
       )}
     </div>
