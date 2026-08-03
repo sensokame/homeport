@@ -39,6 +39,7 @@ Status is always `ok` — the satellite is read-only and degrades gracefully.
 | `knowledge.reading` | none | Currently-reading books, card + focus session mode |
 | `knowledge.project-tasks` | `project_slug` (required) | Open task checklist + collapsible rendered notes for one project — designed to be embedded by [workspace-sat](workspace.md) in project mode, not added directly to a dashboard tab |
 | `knowledge.writing` | none | Writing projects with chapter status, word counts, and streaks; card + focus session mode (start/end tracked writing sessions) |
+| `knowledge.music` | none | Today's scheduled subject, theory curriculum progress, ear-training/scales/sight-reading progress, and session streak; card + focus session mode (start/end tracked practice sessions) |
 | `knowledge.dev` | none | Recently worked-on projects (any project with dev-companion session history) with last-worked time and streak; each row links to the project's live workspace focus view |
 
 ---
@@ -96,6 +97,25 @@ Reads the project's working file — `tasks.md` if present, else `idea.md` (the 
 | `POST /api/writing/projects/{name}/export.pdf` | Project-level PDF export. Body: `{stems: string[] \| null, include_counts: bool}` — `stems` omitted/null exports every chapter in canonical order, a subset exports only those (an excerpt, flagged as such in the PDF header). `include_counts` bakes a page/word-count annotation near the title, computed via a real WeasyPrint render pass (not an estimate) |
 
 Chapter status and session history are stored in a hidden per-project sidecar file, `<project>/.writing-meta.json`, inside the vault — no separate database. Prose chapter files are never touched by this feature (status lives in the sidecar, not chapter frontmatter). Both PDF export routes reuse the same markdown → HTML → WeasyPrint pipeline; the project-level export adds a `break-before: page` div between chapters.
+
+### Music companion (v1.6.0)
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/music/overview` | Today's scheduled slot (day/focus/session shape from the weekly rotation, plus a normalized `subject`), `current_streak_days`, theory curriculum done/total counts, ear-training/scales/sight-reading `progress`, `last_session`, `open_session` |
+| `GET /api/music/schedule` | Full weekly rotation table (`day`, `focus`, `session_shape`) parsed from `schedule.md`'s `## Weekly Rotation` section |
+| `GET /api/music/curriculum/theory` | Theory curriculum checklist — `{index, text, done}` per item, parsed from `schedule.md`'s `## Theory Curriculum` section |
+| `PATCH /api/music/curriculum/theory/{index}` | Body `{done: bool}` — toggles the real checkbox in `schedule.md` in place (same "edit line-by-line, not with a `MULTILINE` regex on a substring" approach as the Projects task-completion endpoint, to avoid corrupting a neighboring line) |
+| `GET /api/music/progress` | Free-form ear-training/scales/sight-reading progress, keyed by agent-assigned item slug — no hardcoded taxonomy |
+| `PATCH /api/music/progress/{subject}/{item_slug}` | `subject` must be one of `ear_training`, `scales`, `sight_reading`. Body `{label: str, status: "introduced"\|"practicing"\|"solid"}` |
+| `POST /api/music/sessions/start` | Body `{subject: str}` — `subject` must be one of `theory`, `piano`, `ear_training`, `guitar`, `review`, `open`. 409 if a session is already open |
+| `POST /api/music/sessions/end` | Computes duration from the open session, appends it to the log; 409 if none is open |
+| `GET /api/music/sessions` | Closed session history + the current `open_session` if any |
+| `GET /api/music/practice-log/today` | `{exists, content}` for today's freeform practice log note (own dated file under `life/Music/practice-log/YYYY/MM/`, unrelated to the sidecar below) |
+| `POST /api/music/practice-log/today` | Creates today's practice log from a template (Focus / What I worked on / What clicked / What needs more work / Notes) if it doesn't exist yet |
+| `PUT /api/music/practice-log/today` | Body `{content: str}` — overwrites today's practice log |
+
+Session history and free-form progress are stored in a hidden sidecar, `life/Music/.music-meta.json` — same "no new satellite, no new DB" pattern as writing/dev. The one real vault checklist (`schedule.md`'s Theory Curriculum) is toggled in place rather than duplicated into the sidecar, mirroring how the Projects section's task checkboxes work. Duration is the only tracked metric — no word-count equivalent.
 
 ### Dev companion (v1.8.0)
 
