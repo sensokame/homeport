@@ -139,6 +139,25 @@ def focus():
     return _parse_focus()
 
 
+class FocusRawRequest(BaseModel):
+    content: str
+
+
+@app.get("/api/focus/raw")
+def focus_raw():
+    if not FOCUS_FILE or not FOCUS_FILE.exists():
+        return JSONResponse({"error": "FOCUS_FILE not configured"}, status_code=503)
+    return {"content": FOCUS_FILE.read_text()}
+
+
+@app.put("/api/focus/raw")
+def focus_raw_save(req: FocusRawRequest):
+    if not FOCUS_FILE:
+        return JSONResponse({"error": "FOCUS_FILE not configured"}, status_code=503)
+    FOCUS_FILE.write_text(req.content)
+    return {"ok": True}
+
+
 # ── Status ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/status")

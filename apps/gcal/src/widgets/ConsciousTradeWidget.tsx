@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SwipeableCard } from '@homeport/ui'
 import type { WidgetProps } from '@homeport/ui'
 import styles from './ConsciousTradeWidget.module.css'
 
@@ -35,6 +36,109 @@ function blockProgress(startIso: string, endIso: string): number {
   const start = new Date(startIso).getTime()
   const end = new Date(endIso).getTime()
   return Math.min(100, Math.max(0, (Date.now() - start) / (end - start) * 100))
+}
+
+function EditFocusPanel({ satelliteUrl }: { satelliteUrl: string }) {
+  const [content, setContent] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    fetch(`${satelliteUrl}/api/focus/raw`)
+      .then(r => r.json())
+      .then((d: { content?: string }) => setContent(d.content ?? ''))
+  }, [satelliteUrl])
+
+  async function handleCommit() {
+    if (content === null) return
+    setSaving(true)
+    setSaved(false)
+    await fetch(`${satelliteUrl}/api/focus/raw`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    setSaving(false)
+    setSaved(true)
+  }
+
+  return (
+    <div className={styles.panel}>
+      <span className={styles.label}>edit focus.md</span>
+      {content === null ? (
+        <p className={styles.muted}>Loading…</p>
+      ) : (
+        <>
+          <textarea
+            className={styles.editArea}
+            value={content}
+            onChange={e => { setContent(e.target.value); setSaved(false) }}
+            spellCheck={false}
+          />
+          <button className={styles.tradeBtn} onClick={handleCommit} disabled={saving}>
+            {saving ? 'Saving…' : saved ? '✓ saved to focus.md' : 'Commit to focus.md'}
+          </button>
+          <p className={styles.muted}>
+            Saves here only — pushing these changes to the actual Google Calendar still happens in a Claude session.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+function HomePanel({
+  data, focus, traded, onTrade, onFocusRequest,
+}: {
+  data: WidgetData
+  focus: FocusData
+  traded: boolean
+  onTrade: () => void
+  onFocusRequest?: () => void
+}) {
+  return (
+    <div className={styles.panel}>
+      {(focus.fields.project?.length || focus.today) && (
+        <div className={styles.section}>
+          <span className={styles.label}>focus</span>
+          {focus.fields.project?.map(p => (
+            <p key={p} className={styles.focusProject}>{p}</p>
+          ))}
+          {focus.today && <p className={styles.focusNote}>{focus.today}</p>}
+        </div>
+      )}
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.label}>now</span>
+          {data.current && onFocusRequest && (
+            <button className={styles.focusBtn} onClick={onFocusRequest}>focus →</button>
+          )}
+        </div>
+        {data.current ? (
+          <>
+            <p className={styles.eventTitle} data-traded={traded}>{data.current.title}</p>
+            <p className={styles.eventTime}>{data.current.start_time} – {data.current.end_time}</p>
+            {!traded ? (
+              <button className={styles.tradeBtn} onClick={onTrade}>
+                Trading for project work →
+              </button>
+            ) : (
+              <span className={styles.tradedBadge}>✓ traded</span>
+            )}
+          </>
+        ) : (
+          <p className={styles.muted}>No active block</p>
+        )}
+      </div>
+      {data.next && (
+        <div className={styles.section}>
+          <span className={styles.label}>next</span>
+          <p className={styles.eventTitle}>{data.next.title}</p>
+          <p className={styles.eventTime}>{data.next.start_time}</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequest, isFocused }: WidgetProps) {
@@ -121,46 +225,17 @@ export function ConsciousTradeWidget({ satelliteUrl, onStatusChange, onFocusRequ
   }
 
   return (
-    <div className={styles.panel}>
-      {(focus.fields.project?.length || focus.today) && (
-        <div className={styles.section}>
-          <span className={styles.label}>focus</span>
-          {focus.fields.project?.map(p => (
-            <p key={p} className={styles.focusProject}>{p}</p>
-          ))}
-          {focus.today && <p className={styles.focusNote}>{focus.today}</p>}
-        </div>
-      )}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.label}>now</span>
-          {data.current && onFocusRequest && (
-            <button className={styles.focusBtn} onClick={onFocusRequest}>focus →</button>
-          )}
-        </div>
-        {data.current ? (
-          <>
-            <p className={styles.eventTitle} data-traded={traded}>{data.current.title}</p>
-            <p className={styles.eventTime}>{data.current.start_time} – {data.current.end_time}</p>
-            {!traded ? (
-              <button className={styles.tradeBtn} onClick={handleTrade}>
-                Trading for project work →
-              </button>
-            ) : (
-              <span className={styles.tradedBadge}>✓ traded</span>
-            )}
-          </>
-        ) : (
-          <p className={styles.muted}>No active block</p>
-        )}
-      </div>
-      {data.next && (
-        <div className={styles.section}>
-          <span className={styles.label}>next</span>
-          <p className={styles.eventTitle}>{data.next.title}</p>
-          <p className={styles.eventTime}>{data.next.start_time}</p>
-        </div>
-      )}
-    </div>
+    <SwipeableCard
+      home={
+        <HomePanel
+          data={data}
+          focus={focus}
+          traded={traded}
+          onTrade={handleTrade}
+          onFocusRequest={onFocusRequest}
+        />
+      }
+      pages={[<EditFocusPanel key="edit" satelliteUrl={satelliteUrl} />]}
+    />
   )
 }
