@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, StatusDot, MetricBar, Button, Modal } from '@homeport/ui'
-import type { Container, ContainerStats, SystemStats, Config } from '../types'
+import type { Container, ContainerStats, SystemStats, Config, HealthResponse, CheckLevel } from '../types'
 import {
   getContainers, getSystem, getAllStats, containerAction, redeployContainer, groupAction,
-  restartAll, updateAll, getUpdateStatus, formatBytes, formatUptime,
+  restartAll, updateAll, getUpdateStatus, getHealth, startIntegrityScan, getScanStatus, formatBytes, formatUptime,
 } from '../api'
 import styles from './Overview.module.css'
 
@@ -18,6 +18,8 @@ const GROUP_LABELS: Record<string, string> = {
   internal:     'Internal',
 }
 
+const LEVEL_ORDER: Record<CheckLevel, number> = { error: 0, warn: 1, ok: 2 }
+
 export default function Overview({ config }: OverviewProps) {
   const [containers, setContainers] = useState<Container[]>([])
   const [system, setSystem]         = useState<SystemStats | null>(null)
@@ -27,6 +29,10 @@ export default function Overview({ config }: OverviewProps) {
   const [updateMsg, setUpdateMsg]   = useState('')
   const [dialog, setDialog]         = useState<{ message: string; onConfirm: () => void } | null>(null)
   const updatePollRef               = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [health, setHealth]         = useState<HealthResponse | null>(null)
+  const [scanning, setScanning]     = useState(false)
+  const [scanMsg, setScanMsg]       = useState('')
+  const scanPollRef                 = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadOverview = useCallback(async () => {
     const [c, s] = await Promise.all([getContainers(), getSystem()])
@@ -53,6 +59,40 @@ export default function Overview({ config }: OverviewProps) {
     const statsTimer = setInterval(loadStats, 12000)
     return () => clearInterval(statsTimer)
   }, [loadStats, containers.length])
+
+  const loadHealth = useCallback(async () => {
+    const h = await getHealth()
+    setHealth(h)
+    setScanning(h.scan_running)
+  }, [])
+
+  useEffect(() => {
+    loadHealth()
+    const healthTimer = setInterval(loadHealth, 30000)
+    return () => clearInterval(healthTimer)
+  }, [loadHealth])
+
+  const handleRunScan = () => {
+    setDialog({
+      message: 'Run a full package integrity scan (dpkg --verify)? Takes about 30 seconds.',
+      onConfirm: async () => {
+        const r = await startIntegrityScan()
+        if (!r.ok) { setScanMsg(r.reason ?? 'already running'); return }
+        setScanning(true)
+        setScanMsg('Scanning…')
+        scanPollRef.current = setInterval(async () => {
+          const s = await getScanStatus()
+          if (!s.running) {
+            clearInterval(scanPollRef.current!)
+            setScanning(false)
+            setScanMsg(s.integrity?.clean ? 'Scan clean' : `Scan found ${s.integrity?.findings.length ?? 0} issue(s)`)
+            setTimeout(() => setScanMsg(''), 8000)
+            loadHealth()
+          }
+        }, 3000)
+      },
+    })
+  }
 
   const handleAction = async (name: string, action: string) => {
     await containerAction(name, action)
@@ -201,6 +241,92 @@ export default function Overview({ config }: OverviewProps) {
         <p className={styles.summary}>
           {loading ? 'Loading…' : `${running} / ${containers.length} running`}
         </p>
+
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTitle}>Health & Security</span>
+            <div className={styles.sectionActions}>
+              <Button size="sm" variant="ghost" disabled={scanning} onClick={handleRunScan}>
+                {scanning ? 'scanning…' : 'run integrity scan'}
+              </Button>
+            </div>
+          </div>
+
+          {health?.status ? (
+            <div className={styles.healthGrid}>
+              <Card className={styles.healthCard}>
+                <span className={styles.healthLabel}>Disk SMART</span>
+                <span className={[styles.healthValue, health.status.smart?.passed === false ? styles.healthAlert : ''].filter(Boolean).join(' ')}>
+                  {health.status.smart?.passed == null ? '—' : health.status.smart.passed ? 'OK' : 'FAILED'}
+                </span>
+                <span className={styles.healthMeta}>
+                  {[
+                    health.status.smart?.temperature_c != null ? `${health.status.smart.temperature_c}°C` : null,
+                    health.status.smart?.media_errors != null ? `${health.status.smart.media_errors} media errors` : null,
+                    health.status.smart?.unsafe_shutdowns != null ? `${health.status.smart.unsafe_shutdowns} unsafe shutdowns` : null,
+                  ].filter(Boolean).join(' · ')}
+                </span>
+              </Card>
+              <Card className={styles.healthCard}>
+                <span className={styles.healthLabel}>fail2ban (sshd)</span>
+                <span className={[styles.healthValue, (health.status.fail2ban?.currently_banned ?? 0) > 0 ? styles.healthAlert : ''].filter(Boolean).join(' ')}>
+                  {health.status.fail2ban?.currently_banned ?? '—'} banned
+                </span>
+                <span className={styles.healthMeta}>{health.status.fail2ban?.total_banned ?? 0} total bans</span>
+              </Card>
+              <Card className={styles.healthCard}>
+                <span className={styles.healthLabel}>Pending updates</span>
+                <span className={styles.healthValue}>{health.status.apt.upgradable_total}</span>
+                <span className={styles.healthMeta}>{health.status.apt.upgradable_security} security</span>
+              </Card>
+            </div>
+          ) : (
+            <p className={styles.muted}>No health data yet</p>
+          )}
+
+          {health?.stale && <p className={styles.updateMsg}>Data is stale — host health-check timer may not be running.</p>}
+
+          {health?.integrity && (
+            <div className={styles.integrityBlock}>
+              <p className={styles.summary}>
+                Last integrity scan: {new Date(health.integrity.finished_at).toLocaleString()} —{' '}
+                {health.integrity.clean ? 'clean' : `${health.integrity.findings.length} finding(s)`}
+              </p>
+              {!health.integrity.clean && (
+                <div className={styles.findingsList}>
+                  {health.integrity.findings.map((f, i) => (
+                    <div key={i} className={[styles.findingRow, f.kind === 'modified' ? styles.findingModified : ''].filter(Boolean).join(' ')}>
+                      <span className={styles.findingFlags}>{f.kind === 'modified' ? f.flags.trim() : 'missing'}</span>
+                      <span className={styles.findingPath}>{f.path}</span>
+                      <span className={styles.findingPackage}>{f.package}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {scanMsg && <p className={styles.updateMsg}>{scanMsg}</p>}
+
+          {health?.checks && (
+            <div className={styles.integrityBlock}>
+              <p className={styles.summary}>
+                Checks (last run {new Date(health.checks.checked_at).toLocaleString()})
+              </p>
+              <div className={styles.findingsList}>
+                {Object.entries(health.checks.checks)
+                  .sort(([a, x], [b, y]) => LEVEL_ORDER[x.level] - LEVEL_ORDER[y.level] || a.localeCompare(b))
+                  .map(([id, c]) => (
+                    <div key={id} className={styles.checkRow} title={`${id} · since ${new Date(c.since).toLocaleString()}`}>
+                      <span className={[styles.checkDot, styles[`check_${c.level}`]].join(' ')} />
+                      <span className={styles.checkLabel}>{c.label}</span>
+                      <span className={styles.checkDetail}>{c.detail}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {sections.map(section => (
           <div key={section.key} className={styles.section}>

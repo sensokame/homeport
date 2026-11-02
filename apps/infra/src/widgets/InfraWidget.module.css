@@ -106,6 +106,7 @@
 
 .dotRunning { background: var(--color-ok); }
 .dotStopped { background: var(--color-error); }
+.dotWarn    { background: var(--color-warn); }
 
 .empty {
   font-size: var(--text-sm);

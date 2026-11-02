@@ -1,9 +1,11 @@
+import json
 import os
 import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import docker
@@ -18,6 +20,13 @@ from starlette.routing import Route
 
 STATIC_DIR = Path(__file__).parent / "static"
 OWN_NAME = os.getenv("CONTAINER_NAME", "infra")
+
+HEALTH_DIR = Path(os.getenv("HEALTH_DIR", "/data/health"))
+HEALTH_STATUS_FILE = HEALTH_DIR / "status.json"
+HEALTH_INTEGRITY_FILE = HEALTH_DIR / "integrity.json"
+HEALTH_CHECKS_FILE = HEALTH_DIR / "checks.json"  # written by the host's station-checks timers
+HEALTH_SCAN_RUNNING = HEALTH_DIR / "scan.running"
+HEALTH_SCAN_TRIGGER = HEALTH_DIR / "scan.trigger"
 
 app = FastAPI()
 docker_client = docker.from_env()
@@ -157,6 +166,12 @@ def widget():
     disk = psutil.disk_usage("/")
 
     if cpu > 80 or disk.percent > 80:
+        status = "warn"
+
+    health = _read_json_file(HEALTH_STATUS_FILE)
+    integrity = _read_json_file(HEALTH_INTEGRITY_FILE)
+    checks = _read_json_file(HEALTH_CHECKS_FILE)
+    if _health_status_summary(health, integrity, checks) == "warn":
         status = "warn"
 
     return {
@@ -311,6 +326,81 @@ def system_stats():
     }
 
 
+# ── Health & Security ────────────────────────────────────────────────────────
+# Data is produced host-side by systemd timers (homeport-health-check.timer every
+# 5 min, homeport-integrity-scan.timer daily) writing JSON into HEALTH_DIR — kept
+# out of this container's own privileges (no NVMe device, no fail2ban socket) by
+# design; see reference_homeport_satellite_template / project_dashboard memory.
+
+def _read_json_file(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _health_status_summary(status: dict | None, integrity: dict | None, checks: dict | None = None) -> str:
+    """warn only for things that actually need attention — never for routine
+    pending-update counts, per feedback_widget_status_semantics."""
+    if status is None:
+        return "error"
+    smart = status.get("smart")
+    if smart and (smart.get("passed") is False or (smart.get("media_errors") or 0) > 0):
+        return "warn"
+    f2b = status.get("fail2ban")
+    if f2b and (f2b.get("currently_banned") or 0) > 0:
+        return "warn"
+    # Only escalate on real content mismatches ('modified') — a 'missing' finding
+    # is frequently a deliberate admin action (masked unit, disabled config) and
+    # shouldn't itself flip the dashboard badge.
+    if integrity and any(f.get("kind") == "modified" for f in integrity.get("findings", [])):
+        return "warn"
+    # station-checks: only its error tier (new admin, unexpected route, site down, stale
+    # snapshots) flips the badge; its warn tier (e.g. CVEs waiting on upstream) is routine.
+    if checks and any(c.get("level") == "error" for c in checks.get("checks", {}).values()):
+        return "warn"
+    return "ok"
+
+
+@app.get("/api/health")
+def get_health():
+    status = _read_json_file(HEALTH_STATUS_FILE)
+    integrity = _read_json_file(HEALTH_INTEGRITY_FILE)
+    checks = _read_json_file(HEALTH_CHECKS_FILE)
+    stale = True
+    if status and status.get("checked_at"):
+        try:
+            checked = datetime.fromisoformat(status["checked_at"].replace("Z", "+00:00"))
+            stale = (datetime.now(timezone.utc) - checked).total_seconds() > 900  # 3 missed ticks
+        except Exception:
+            stale = True
+    return {
+        "status": status,
+        "integrity": integrity,
+        "checks": checks,
+        "stale": stale,
+        "scan_running": HEALTH_SCAN_RUNNING.exists(),
+        "summary_status": _health_status_summary(status, integrity, checks),
+    }
+
+
+@app.post("/api/health/scan")
+def start_integrity_scan():
+    if HEALTH_SCAN_RUNNING.exists():
+        return {"ok": False, "reason": "already running"}
+    HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+    HEALTH_SCAN_TRIGGER.write_text(str(time.time()))
+    return {"ok": True}
+
+
+@app.get("/api/health/scan-status")
+def integrity_scan_status():
+    return {
+        "running": HEALTH_SCAN_RUNNING.exists(),
+        "integrity": _read_json_file(HEALTH_INTEGRITY_FILE),
+    }
+
+
 # ── Actions ───────────────────────────────────────────────────────────────────
 
 @app.post("/api/actions/restart-all")
@@ -359,6 +449,12 @@ def mcp_containers() -> list[dict]:
 def mcp_system() -> dict:
     """Current CPU/RAM/disk usage on the host."""
     return system_stats()
+
+
+@mcp_server.resource("infra://health", mime_type="application/json")
+def mcp_health() -> dict:
+    """SMART/fail2ban/pending-updates/package-integrity health snapshot."""
+    return get_health()
 
 
 mcp_app = mcp_server.streamable_http_app()

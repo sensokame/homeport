@@ -1,4 +1,4 @@
-import type { Container, ContainerDetail, ContainerStats, SystemStats, Config, UpdateStatus } from './types'
+import type { Container, ContainerDetail, ContainerStats, SystemStats, Config, UpdateStatus, HealthResponse, ScanStatus } from './types'
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const r = await fetch(`/api${path}`, opts)
@@ -21,6 +21,9 @@ export const getSystem      = () => req<SystemStats>('/system')
 export const restartAll     = () => req<{ ok: boolean; count: number }>('/actions/restart-all', { method: 'POST' })
 export const updateAll      = () => req<{ ok: boolean; reason?: string }>('/actions/update-all', { method: 'POST' })
 export const getUpdateStatus = () => req<UpdateStatus>('/actions/update-status')
+export const getHealth      = () => req<HealthResponse>('/health')
+export const startIntegrityScan = () => req<{ ok: boolean; reason?: string }>('/health/scan', { method: 'POST' })
+export const getScanStatus  = () => req<ScanStatus>('/health/scan-status')
 
 export function formatBytes(b: number): string {
   if (!b) return '0 B'
