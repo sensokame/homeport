@@ -92,3 +92,9 @@ declare module 'wger/FitnessWidget' {
   const component: WidgetComponent
   export default component
 }
+
+declare module 'finance/FinanceOverviewWidget' {
+  import type { WidgetComponent } from '@homeport/ui'
+  const component: WidgetComponent
+  export default component
+}

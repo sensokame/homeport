@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@homeport/ui": ["../../packages/ui/src/index.ts"],
+      "@homeport/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src"]
+}

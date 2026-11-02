@@ -13,6 +13,7 @@ const MusicWidget            = lazy(() => import('knowledge/MusicWidget'))
 const DevWidget               = lazy(() => import('knowledge/DevWidget'))
 const WorkspacePanelWidget   = lazy(() => import('workspace/WorkspacePanelWidget'))
 const WorkspaceOverviewTeaserWidget = lazy(() => import('workspace/WorkspaceOverviewTeaserWidget'))
+const FinanceOverviewWidget  = lazy(() => import('finance/FinanceOverviewWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
   'builtin.clock': {
@@ -114,5 +115,13 @@ export const registry: Record<string, WidgetManifest> = {
     configSchema: {},
     component: CalendarWidget,
     defaultIcon: 'calendar',
+  },
+  'finance.overview': {
+    id: 'finance.overview',
+    name: 'Finance',
+    description: 'Portfolio overview and trade proposals (scaffolding stage)',
+    configSchema: {},
+    component: FinanceOverviewWidget,
+    defaultIcon: 'dollar-sign',
   },
 }

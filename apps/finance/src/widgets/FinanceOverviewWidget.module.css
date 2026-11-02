@@ -1,0 +1,48 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pageTitle {
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--color-text-muted);
+}
+
+.totals {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.totalValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.cash {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.holdings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.holdingRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.holdingName {
+  color: var(--color-text-muted);
+}

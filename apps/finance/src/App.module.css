@@ -1,0 +1,82 @@
+.root {
+  min-height: 100vh;
+}
+
+.main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5);
+}
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-8);
+}
+
+.setupTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.totals {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.totalValue {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.cash {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--color-text-muted);
+}
+
+.holdings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.holdingCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.holdingName {
+  font-weight: 600;
+}
+
+.holdingMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.holdingValue {
+  font-size: var(--text-base);
+  font-weight: 600;
+}

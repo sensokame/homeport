@@ -25,6 +25,11 @@
       "id": "workspace",
       "url": "http://workspace.station",
       "widgetUrl": "http://workspace-sat:8080"
+    },
+    {
+      "id": "finance",
+      "url": "http://finance.station",
+      "widgetUrl": "http://finance:8080"
     }
   ],
   "tabs": [
@@ -47,6 +52,12 @@
           "instanceId": "infra-main",
           "widgetId": "infra.overview",
           "satelliteId": "infra",
+          "config": {}
+        },
+        {
+          "instanceId": "finance-main",
+          "widgetId": "finance.overview",
+          "satelliteId": "finance",
           "config": {}
         }
       ]

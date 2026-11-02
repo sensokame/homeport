@@ -14,6 +14,7 @@ export default defineConfig({
         inventory: '/api/remote/inventory/assets/remoteEntry.js',
         knowledge: '/api/remote/knowledge/assets/remoteEntry.js',
         workspace: '/api/remote/workspace/assets/remoteEntry.js',
+        finance:   '/api/remote/finance/assets/remoteEntry.js',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^18.3.0' },
@@ -52,6 +53,10 @@ export default defineConfig({
       '/api/remote/workspace': {
         target: 'http://localhost:5180',
         rewrite: (path) => path.replace(/^\/api\/remote\/workspace/, ''),
+      },
+      '/api/remote/finance': {
+        target: 'http://localhost:5181',
+        rewrite: (path) => path.replace(/^\/api\/remote\/finance/, ''),
       },
     },
   },
