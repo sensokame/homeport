@@ -5,9 +5,15 @@
 /* System metrics */
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-4);
   margin-bottom: var(--space-5);
+}
+
+.drives {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .summary {

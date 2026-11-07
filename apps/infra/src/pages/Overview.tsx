@@ -234,7 +234,24 @@ export default function Overview({ config }: OverviewProps) {
           <div className={styles.metrics}>
             <MetricBar label="CPU"  value={`${system.cpu_percent}%`}  percent={system.cpu_percent} />
             <MetricBar label="RAM"  value={`${formatBytes(system.mem_used)} / ${formatBytes(system.mem_total)}`} percent={system.mem_percent} />
-            <MetricBar label="Disk" value={`${system.disk_percent}%`} percent={system.disk_percent} />
+          </div>
+        )}
+
+        {system && system.disks?.length > 0 && (
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <span className={styles.sectionTitle}>Drives</span>
+            </div>
+            <div className={styles.drives}>
+              {system.disks.map(d => (
+                <MetricBar
+                  key={d.label}
+                  label={d.device ? `${d.label} · ${d.device}` : d.label}
+                  value={d.available ? `${formatBytes(d.used)} / ${formatBytes(d.total)} (${d.percent}%)` : 'not mounted'}
+                  percent={d.percent}
+                />
+              ))}
+            </div>
           </div>
         )}
 

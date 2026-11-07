@@ -113,3 +113,17 @@
   color: var(--color-muted);
   margin: 0;
 }
+
+.driveDevice {
+  color: var(--color-muted);
+}
+
+.driveUsage {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.driveUsage.alert {
+  color: var(--color-warn);
+}

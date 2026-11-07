@@ -23,7 +23,17 @@ export interface ContainerStats {
   net_tx: number
 }
 
+export interface Drive {
+  label: string
+  device: string
+  used: number
+  total: number
+  percent: number
+  available: boolean
+}
+
 export interface SystemStats {
+  disks: Drive[]
   cpu_percent: number
   mem_used: number
   mem_total: number

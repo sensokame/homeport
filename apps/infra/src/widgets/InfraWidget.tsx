@@ -4,7 +4,8 @@ import type { WidgetProps } from '@homeport/ui'
 import styles from './InfraWidget.module.css'
 
 interface Metric { label: string; value: string; alert?: boolean }
-interface WidgetData { status: 'ok' | 'warn' | 'error'; summary: string; metrics: Metric[] }
+interface Drive { label: string; device: string; used: number; total: number; percent: number; available: boolean }
+interface WidgetData { status: 'ok' | 'warn' | 'error'; summary: string; metrics: Metric[]; disks?: Drive[] }
 interface Container { name: string; status: string; group: string; url: string }
 interface Check { label: string; level: 'ok' | 'warn' | 'error'; detail: string }
 
@@ -38,6 +39,34 @@ function HomePanel({ data, containers }: { data: WidgetData; containers: Contain
             <span className={styles.metricLabel}>{m.label}</span>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function formatSize(bytes: number) {
+  const gb = bytes / 1e9
+  return gb >= 1000 ? `${(gb / 1000).toFixed(1)} TB` : `${gb.toFixed(0)} GB`
+}
+
+function DrivesPanel({ disks }: { disks: Drive[] }) {
+  return (
+    <div className={styles.panel}>
+      <span className={styles.groupTitle}>Drives</span>
+      <div className={styles.containerList}>
+        {disks.map(d => {
+          const alert = !d.available || d.percent > 80
+          return (
+            <div key={d.label} className={styles.containerRow}>
+              <span className={styles.containerName}>
+                {d.label}{d.device && <span className={styles.driveDevice}> · {d.device}</span>}
+              </span>
+              <span className={[styles.driveUsage, alert ? styles.alert : ''].filter(Boolean).join(' ')}>
+                {d.available ? `${formatSize(d.used)} / ${formatSize(d.total)} · ${d.percent}%` : 'not mounted'}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -176,6 +205,7 @@ export function InfraWidget({ satelliteUrl, onStatusChange }: WidgetProps) {
     <SwipeableCard
       home={<HomePanel data={data} containers={containers} />}
       pages={[
+        ...(data.disks?.length ? [<DrivesPanel key="drives" disks={data.disks} />] : []),
         ...groups.map(g => <GroupPanel key={g.group} group={g.group} containers={g.containers} />),
         <HealthPanel key="health" health={health} />,
         <ChecksPanel key="checks" health={health} />,

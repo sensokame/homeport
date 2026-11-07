@@ -28,6 +28,38 @@ HEALTH_CHECKS_FILE = HEALTH_DIR / "checks.json"  # written by the host's station
 HEALTH_SCAN_RUNNING = HEALTH_DIR / "scan.running"
 HEALTH_SCAN_TRIGGER = HEALTH_DIR / "scan.trigger"
 
+# Drives to report, as "Label|Device=/path" entries separated by commas. Host
+# filesystems other than / must be bind-mounted into the container (read-only).
+# Inside the container "/" is the overlay root, which reports the host's root fs.
+DISK_MOUNTS = os.getenv("DISK_MOUNTS", "System|=/")
+
+
+def _parse_disk_mounts(spec: str) -> list[tuple[str, str, str]]:
+    out = []
+    for entry in spec.split(","):
+        if "=" not in entry:
+            continue
+        name, path = entry.rsplit("=", 1)
+        label, _, device = name.partition("|")
+        out.append((label.strip(), device.strip(), path.strip()))
+    return out or [("System", "", "/")]
+
+
+_DISK_MOUNTS = _parse_disk_mounts(DISK_MOUNTS)
+
+
+def _disks() -> list[dict]:
+    disks = []
+    for label, device, path in _DISK_MOUNTS:
+        try:
+            d = psutil.disk_usage(path)
+        except OSError:
+            disks.append({"label": label, "device": device, "used": 0, "total": 0, "percent": 0, "available": False})
+            continue
+        disks.append({"label": label, "device": device, "used": d.used, "total": d.total,
+                      "percent": round(d.percent, 1), "available": True})
+    return disks
+
 app = FastAPI()
 docker_client = docker.from_env()
 
@@ -163,9 +195,11 @@ def widget():
 
     cpu = _cpu_percent
     mem = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disks = _disks()
+    fullest = max(disks, key=lambda d: d["percent"])
+    disk_alert = any(d["percent"] > 80 or not d["available"] for d in disks)
 
-    if cpu > 80 or disk.percent > 80:
+    if cpu > 80 or disk_alert:
         status = "warn"
 
     health = _read_json_file(HEALTH_STATUS_FILE)
@@ -181,8 +215,9 @@ def widget():
         "metrics": [
             {"label": "CPU",  "value": f"{round(cpu, 1)}%", "alert": cpu > 80},
             {"label": "RAM",  "value": f"{mem.used / 1e9:.1f} GB / {mem.total / 1e9:.1f} GB"},
-            {"label": "Disk", "value": f"{disk.percent}%", "alert": disk.percent > 80},
+            {"label": "Drives", "value": f"{fullest['percent']}% max", "alert": disk_alert},
         ],
+        "disks": disks,
     }
 
 
@@ -316,6 +351,7 @@ def system_stats():
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     return {
+        "disks": _disks(),
         "cpu_percent": round(cpu, 1),
         "mem_used": mem.used,
         "mem_total": mem.total,
