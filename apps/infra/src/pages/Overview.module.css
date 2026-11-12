@@ -150,3 +150,31 @@
 .check_error { background: var(--color-error); }
 .checkLabel { color: var(--color-text); flex-shrink: 0; min-width: 12rem; }
 .checkDetail { color: var(--color-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Checks grouped by id prefix (accounts., audit., …); header toggles the group */
+.checkGroups {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-2);
+}
+.checkGroup { border-bottom: 1px solid var(--color-border); }
+.checkGroup:last-child { border-bottom: none; }
+.checkGroup .findingsList { margin: 0 0 var(--space-2) var(--space-5); }
+.checkGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) 0;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.checkGroupHeader:hover .checkGroupLabel { text-decoration: underline; }
+.checkGroupChevron { color: var(--color-muted); width: 1em; flex-shrink: 0; }
+.checkGroupLabel { font-weight: 500; }
+.checkGroupCount { color: var(--color-muted); margin-left: auto; }

@@ -24,6 +24,7 @@ export const getUpdateStatus = () => req<UpdateStatus>('/actions/update-status')
 export const getHealth      = () => req<HealthResponse>('/health')
 export const startIntegrityScan = () => req<{ ok: boolean; reason?: string }>('/health/scan', { method: 'POST' })
 export const getScanStatus  = () => req<ScanStatus>('/health/scan-status')
+export const startAudit     = () => req<{ ok: boolean; reason?: string }>('/health/audit', { method: 'POST' })
 
 export function formatBytes(b: number): string {
   if (!b) return '0 B'

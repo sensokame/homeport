@@ -107,6 +107,7 @@ export interface HealthResponse {
   checks: StationChecks | null
   stale: boolean
   scan_running: boolean
+  audit_running: boolean
   summary_status: 'ok' | 'warn' | 'error'
 }
 

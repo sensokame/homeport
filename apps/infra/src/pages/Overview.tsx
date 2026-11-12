@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, StatusDot, MetricBar, Button, Modal } from '@homeport/ui'
-import type { Container, ContainerStats, SystemStats, Config, HealthResponse, CheckLevel } from '../types'
+import type { Container, ContainerStats, SystemStats, Config, HealthResponse, CheckLevel, StationCheck } from '../types'
 import {
   getContainers, getSystem, getAllStats, containerAction, redeployContainer, groupAction,
-  restartAll, updateAll, getUpdateStatus, getHealth, startIntegrityScan, getScanStatus, formatBytes, formatUptime,
+  restartAll, updateAll, getUpdateStatus, getHealth, startIntegrityScan, getScanStatus, startAudit,
+  formatBytes, formatUptime,
 } from '../api'
 import styles from './Overview.module.css'
 
@@ -20,6 +21,59 @@ const GROUP_LABELS: Record<string, string> = {
 
 const LEVEL_ORDER: Record<CheckLevel, number> = { error: 0, warn: 1, ok: 2 }
 
+// station-checks ids are "<group>.<name>"; unknown prefixes fall back to the capitalised prefix.
+const CHECK_GROUP_LABELS: Record<string, string> = {
+  audit:    'Tampering audit',
+  accounts: 'Accounts',
+  exposure: 'Exposure',
+  security: 'Security',
+  uptime:   'Uptime',
+  backup:   'Backups',
+  updates:  'Updates',
+  dns:      'DNS',
+  internal: 'Check failures',
+}
+
+interface CheckGroup {
+  key: string
+  label: string
+  worst: CheckLevel
+  counts: Record<CheckLevel, number>
+  checks: [string, StationCheck][]
+}
+
+function groupChecks(checks: Record<string, StationCheck>): CheckGroup[] {
+  const groups = new Map<string, CheckGroup>()
+  for (const [id, c] of Object.entries(checks)) {
+    const key = id.split('.')[0]
+    let g = groups.get(key)
+    if (!g) {
+      g = {
+        key,
+        label: CHECK_GROUP_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1),
+        worst: 'ok',
+        counts: { error: 0, warn: 0, ok: 0 },
+        checks: [],
+      }
+      groups.set(key, g)
+    }
+    g.checks.push([id, c])
+    g.counts[c.level] += 1
+    if (LEVEL_ORDER[c.level] < LEVEL_ORDER[g.worst]) g.worst = c.level
+  }
+  for (const g of groups.values()) {
+    g.checks.sort(([a, x], [b, y]) => LEVEL_ORDER[x.level] - LEVEL_ORDER[y.level] || a.localeCompare(b))
+  }
+  return [...groups.values()].sort((a, b) => LEVEL_ORDER[a.worst] - LEVEL_ORDER[b.worst] || a.label.localeCompare(b.label))
+}
+
+function groupSummary(g: CheckGroup): string {
+  return (['error', 'warn', 'ok'] as CheckLevel[])
+    .filter(l => g.counts[l] > 0)
+    .map(l => `${g.counts[l]} ${l}`)
+    .join(' · ')
+}
+
 export default function Overview({ config }: OverviewProps) {
   const [containers, setContainers] = useState<Container[]>([])
   const [system, setSystem]         = useState<SystemStats | null>(null)
@@ -33,6 +87,11 @@ export default function Overview({ config }: OverviewProps) {
   const [scanning, setScanning]     = useState(false)
   const [scanMsg, setScanMsg]       = useState('')
   const scanPollRef                 = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [auditing, setAuditing]     = useState(false)
+  const [auditMsg, setAuditMsg]     = useState('')
+  const auditPollRef                = useRef<ReturnType<typeof setInterval> | null>(null)
+  // explicit open/closed per check group; groups not in here follow their default
+  const [groupOpen, setGroupOpen]   = useState<Record<string, boolean>>({})
 
   const loadOverview = useCallback(async () => {
     const [c, s] = await Promise.all([getContainers(), getSystem()])
@@ -64,7 +123,32 @@ export default function Overview({ config }: OverviewProps) {
     const h = await getHealth()
     setHealth(h)
     setScanning(h.scan_running)
+    return h
   }, [])
+
+  useEffect(() => () => { if (auditPollRef.current) clearInterval(auditPollRef.current) }, [])
+
+  const handleRunAudit = async () => {
+    const r = await startAudit()
+    if (!r.ok) { setAuditMsg(r.reason ?? 'already running'); return }
+    setAuditing(true)
+    setAuditMsg('Running audit…')
+    auditPollRef.current = setInterval(async () => {
+      const h = await loadHealth()
+      if (h.audit_running) return
+      clearInterval(auditPollRef.current!)
+      auditPollRef.current = null
+      setAuditing(false)
+      const flagged = Object.entries(h.checks?.checks ?? {}).filter(([id, c]) => id.startsWith('audit.') && c.level !== 'ok')
+      setAuditMsg(flagged.length === 0
+        ? 'Audit clean: everything matches the approved baseline'
+        : `Audit: ${flagged.length} check(s) differ from the baseline (inspect with: sudo station-checks diff)`)
+      setTimeout(() => setAuditMsg(''), 10000)
+    }, 2000)
+  }
+
+  const toggleGroup = (g: CheckGroup) =>
+    setGroupOpen(s => ({ ...s, [g.key]: !(s[g.key] ?? g.worst !== 'ok') }))
 
   useEffect(() => {
     loadHealth()
@@ -263,6 +347,9 @@ export default function Overview({ config }: OverviewProps) {
           <div className={styles.sectionHeader}>
             <span className={styles.sectionTitle}>Health & Security</span>
             <div className={styles.sectionActions}>
+              <Button size="sm" variant="ghost" disabled={auditing || health?.audit_running} onClick={handleRunAudit}>
+                {auditing || health?.audit_running ? 'auditing…' : 'run audit'}
+              </Button>
               <Button size="sm" variant="ghost" disabled={scanning} onClick={handleRunScan}>
                 {scanning ? 'scanning…' : 'run integrity scan'}
               </Button>
@@ -324,22 +411,43 @@ export default function Overview({ config }: OverviewProps) {
           )}
 
           {scanMsg && <p className={styles.updateMsg}>{scanMsg}</p>}
+          {auditMsg && <p className={styles.updateMsg}>{auditMsg}</p>}
 
           {health?.checks && (
             <div className={styles.integrityBlock}>
               <p className={styles.summary}>
                 Checks (last run {new Date(health.checks.checked_at).toLocaleString()})
               </p>
-              <div className={styles.findingsList}>
-                {Object.entries(health.checks.checks)
-                  .sort(([a, x], [b, y]) => LEVEL_ORDER[x.level] - LEVEL_ORDER[y.level] || a.localeCompare(b))
-                  .map(([id, c]) => (
-                    <div key={id} className={styles.checkRow} title={`${id} · since ${new Date(c.since).toLocaleString()}`}>
-                      <span className={[styles.checkDot, styles[`check_${c.level}`]].join(' ')} />
-                      <span className={styles.checkLabel}>{c.label}</span>
-                      <span className={styles.checkDetail}>{c.detail}</span>
+              <div className={styles.checkGroups}>
+                {groupChecks(health.checks.checks).map(g => {
+                  const open = groupOpen[g.key] ?? g.worst !== 'ok'
+                  return (
+                    <div key={g.key} className={styles.checkGroup}>
+                      <button
+                        type="button"
+                        className={styles.checkGroupHeader}
+                        onClick={() => toggleGroup(g)}
+                        aria-expanded={open}
+                      >
+                        <span className={styles.checkGroupChevron}>{open ? '▾' : '▸'}</span>
+                        <span className={[styles.checkDot, styles[`check_${g.worst}`]].join(' ')} />
+                        <span className={styles.checkGroupLabel}>{g.label}</span>
+                        <span className={styles.checkGroupCount}>{groupSummary(g)}</span>
+                      </button>
+                      {open && (
+                        <div className={styles.findingsList}>
+                          {g.checks.map(([id, c]) => (
+                            <div key={id} className={styles.checkRow} title={`${id} · since ${new Date(c.since).toLocaleString()}`}>
+                              <span className={[styles.checkDot, styles[`check_${c.level}`]].join(' ')} />
+                              <span className={styles.checkLabel}>{c.label}</span>
+                              <span className={styles.checkDetail}>{c.detail}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )
+                })}
               </div>
             </div>
           )}

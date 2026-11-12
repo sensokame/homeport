@@ -27,6 +27,10 @@ HEALTH_INTEGRITY_FILE = HEALTH_DIR / "integrity.json"
 HEALTH_CHECKS_FILE = HEALTH_DIR / "checks.json"  # written by the host's station-checks timers
 HEALTH_SCAN_RUNNING = HEALTH_DIR / "scan.running"
 HEALTH_SCAN_TRIGGER = HEALTH_DIR / "scan.trigger"
+# On-demand station-checks tampering audit: a host .path unit watches the trigger file,
+# runs `station-checks audit` (rewrites checks.json) and removes both files when done.
+HEALTH_AUDIT_RUNNING = HEALTH_DIR / "audit.running"
+HEALTH_AUDIT_TRIGGER = HEALTH_DIR / "audit.trigger"
 
 # Drives to report, as "Label|Device=/path" entries separated by commas. Host
 # filesystems other than / must be bind-mounted into the container (read-only).
@@ -416,6 +420,7 @@ def get_health():
         "checks": checks,
         "stale": stale,
         "scan_running": HEALTH_SCAN_RUNNING.exists(),
+        "audit_running": HEALTH_AUDIT_RUNNING.exists() or HEALTH_AUDIT_TRIGGER.exists(),
         "summary_status": _health_status_summary(status, integrity, checks),
     }
 
@@ -426,6 +431,15 @@ def start_integrity_scan():
         return {"ok": False, "reason": "already running"}
     HEALTH_DIR.mkdir(parents=True, exist_ok=True)
     HEALTH_SCAN_TRIGGER.write_text(str(time.time()))
+    return {"ok": True}
+
+
+@app.post("/api/health/audit")
+def start_audit():
+    if HEALTH_AUDIT_RUNNING.exists() or HEALTH_AUDIT_TRIGGER.exists():
+        return {"ok": False, "reason": "already running"}
+    HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+    HEALTH_AUDIT_TRIGGER.write_text(str(time.time()))
     return {"ok": True}
 
 
