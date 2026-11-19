@@ -223,27 +223,29 @@ export default function Overview({ config }: OverviewProps) {
 
   const handleUpdateAll = () => {
     setDialog({
-      message: 'Pull latest images for all containers and restart those that changed?',
+      message: 'Pull new images and recreate only the containers that changed? Sites are checked afterwards.',
       onConfirm: async () => {
         const r = await updateAll()
         if (!r.ok) { setUpdateMsg(r.reason ?? 'already running'); return }
         setUpdating(true)
-        setUpdateMsg('Pulling images…')
+        setUpdateMsg('Updating…')
+        let seenRunning = false
         updatePollRef.current = setInterval(async () => {
-          const s = await getUpdateStatus()
-          if (!s.running) {
-            clearInterval(updatePollRef.current!)
-            setUpdating(false)
-            const updated  = s.results.filter(r => r.status === 'updated').length
-            const upToDate = s.results.filter(r => r.status === 'up-to-date').length
-            const errors   = s.results.filter(r => r.status === 'error').length
-            setUpdateMsg(`${updated} updated, ${upToDate} up-to-date${errors ? `, ${errors} errors` : ''}`)
-            setTimeout(() => setUpdateMsg(''), 8000)
-            if (updated > 0) loadOverview()
-          } else {
-            setUpdateMsg(`Pulling… (${s.results.length} done)`)
-          }
-        }, 2000)
+          let s
+          try { s = await getUpdateStatus() } catch { return }  // infra itself may be recreating
+          if (s.running) { seenRunning = true; return }
+          if (!seenRunning && !s.last) return
+          clearInterval(updatePollRef.current!)
+          setUpdating(false)
+          const last = s.last
+          if (!last) { setUpdateMsg('Update finished, no result written'); return }
+          const names = last.updated.map(u => u.name)
+          const parts = [names.length ? `Updated: ${names.join(', ')}` : 'Everything up to date']
+          if (last.failed.length) parts.push(`${last.failed.length} problem(s): ${last.failed.map(f => f.what).join(', ')}`)
+          setUpdateMsg(parts.join(' · '))
+          setTimeout(() => setUpdateMsg(''), last.failed.length ? 30000 : 10000)
+          if (names.length) loadOverview()
+        }, 3000)
       },
     })
   }

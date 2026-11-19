@@ -48,10 +48,19 @@ export interface Config {
   hostname: string
 }
 
+export interface UpdateResult {
+  started: string
+  finished: string
+  ok: boolean
+  updated: Array<{ name: string; image: string }>
+  kept_local: string[]
+  failed: Array<{ what: string; detail: string }>
+  snapshot: string | null
+}
+
 export interface UpdateStatus {
   running: boolean
-  done: boolean
-  results: Array<{ name: string; status: string; reason?: string }>
+  last: UpdateResult | null  // written by the host's station-update run
 }
 
 export interface SmartStats {

@@ -31,6 +31,11 @@ HEALTH_SCAN_TRIGGER = HEALTH_DIR / "scan.trigger"
 # runs `station-checks audit` (rewrites checks.json) and removes both files when done.
 HEALTH_AUDIT_RUNNING = HEALTH_DIR / "audit.running"
 HEALTH_AUDIT_TRIGGER = HEALTH_DIR / "audit.trigger"
+# Container updates run host-side (station-update via homeport-update.path), same
+# trigger-file pattern as the audit: the container never pulls or recreates itself.
+HEALTH_UPDATE_RUNNING = HEALTH_DIR / "update.running"
+HEALTH_UPDATE_TRIGGER = HEALTH_DIR / "update.trigger"
+HEALTH_UPDATE_RESULT = HEALTH_DIR / "update-containers.json"
 
 # Drives to report, as "Label|Device=/path" entries separated by commas. Host
 # filesystems other than / must be bind-mounted into the container (read-only).
@@ -66,9 +71,6 @@ def _disks() -> list[dict]:
 
 app = FastAPI()
 docker_client = docker.from_env()
-
-_update_lock = threading.Lock()
-_update_state: dict = {"running": False, "done": False, "results": []}
 
 # Background sampler — owns all psutil.cpu_percent() calls (delta-based, races
 # to 0% if called from multiple endpoints) and the Docker container list
@@ -107,32 +109,6 @@ def _cached_containers(all: bool = True) -> list:
     if not all:
         return [c for c in containers if c.status == "running"]
     return containers
-
-
-def _run_update():
-    results = []
-    try:
-        containers = [c for c in _cached_containers(all=False) if c.name != OWN_NAME]
-        for c in containers:
-            try:
-                tag = c.image.tags[0] if c.image.tags else None
-                if not tag:
-                    results.append({"name": c.name, "status": "skipped"})
-                    continue
-                old_id = c.image.id
-                new_img = docker_client.images.pull(tag)
-                if new_img.id != old_id:
-                    c.restart()
-                    results.append({"name": c.name, "status": "updated"})
-                else:
-                    results.append({"name": c.name, "status": "up-to-date"})
-            except Exception as e:
-                results.append({"name": c.name, "status": "error", "reason": str(e)})
-    finally:
-        with _update_lock:
-            _update_state["running"] = False
-            _update_state["done"] = True
-            _update_state["results"] = results
 
 
 def _container_info(c) -> dict:
@@ -463,19 +439,19 @@ def restart_all():
 
 @app.post("/api/actions/update-all")
 def update_all():
-    with _update_lock:
-        if _update_state["running"]:
-            return {"ok": False, "reason": "already running"}
-        _update_state["running"] = True
-        _update_state["done"] = False
-        _update_state["results"] = []
-    threading.Thread(target=_run_update, daemon=True).start()
+    if HEALTH_UPDATE_RUNNING.exists() or HEALTH_UPDATE_TRIGGER.exists():
+        return {"ok": False, "reason": "already running"}
+    HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+    HEALTH_UPDATE_TRIGGER.write_text(str(time.time()))
     return {"ok": True}
 
 
 @app.get("/api/actions/update-status")
 def update_status():
-    return dict(_update_state)
+    return {
+        "running": HEALTH_UPDATE_RUNNING.exists() or HEALTH_UPDATE_TRIGGER.exists(),
+        "last": _read_json_file(HEALTH_UPDATE_RESULT),
+    }
 
 
 # ── MCP (read-only — mirrors knowledge-sat, see homeport vault agent-integration.md) ──
