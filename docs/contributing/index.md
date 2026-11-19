@@ -24,7 +24,7 @@
 
 5. Start a satellite's frontend (for widget development):
    ```bash
-   pnpm --filter vikunja dev   # or infra, inventory, wger, actual, gcal
+   pnpm --filter infra dev   # or inventory, gcal, workspace, finance
    ```
    Each satellite frontend runs on a dedicated port (5174–5180). The hub dev proxy picks them up automatically.
 
@@ -44,10 +44,10 @@ homeport/
 ├── apps/infra/         infrastructure satellite
 ├── apps/inventory/     inventory satellite
 ├── apps/obsidian/      knowledge satellite (Python backend only)
-├── apps/vikunja/       tasks satellite (Python backend + React widgets)
-├── apps/wger/          fitness satellite (Python backend + React widgets)
-├── apps/actual/        budget satellite (Node.js + React)
-└── apps/gcal/          calendar satellite (Node.js + React widgets)
+├── apps/gcal/          calendar satellite
+├── apps/workspace/     workspace satellite (composes other satellites' widgets)
+├── apps/mcp-gateway/   MCP gateway satellite (agent access layer)
+└── apps/finance/       finance satellite (Python backend + React widget)
 ```
 
 See [Architecture](../architecture/index.md) for how the pieces fit together.

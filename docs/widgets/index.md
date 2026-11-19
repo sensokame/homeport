@@ -9,10 +9,10 @@ homeport's dashboard is built from **widgets** — self-contained React componen
 ```
 dashboard.json          widget registry         rendered hub
 ─────────────────       ─────────────────       ──────────────────
-tab: Overview           vikunja.task-overview   ┌─ shell header ─┐
-  widget:                 component ──────────► │ Tasks          │
-    vikunja.task-overview satellite url         │ SwipeableCard  │
-    satelliteId: vikunja  config: {}            │  home: summary │
+tab: Overview           inventory.overview      ┌─ shell header ─┐
+  widget:                 component ──────────► │ Inventory      │
+    inventory.overview    satellite url         │ SwipeableCard  │
+    satelliteId: inventory  config: {}          │  home: summary │
     config: {}                                  │  pages: proj.  │
                                                 └── open →  ─────┘
 ```
@@ -71,7 +71,7 @@ Declares a widget to the registry:
 
 ```typescript
 interface WidgetManifest {
-  id: string                                // e.g. "vikunja.task-overview"
+  id: string                                // e.g. "inventory.overview"
   name: string                              // shown in shell header + settings drawer
   description: string
   configSchema: Record<string, ConfigField> // empty object if no config needed
@@ -118,9 +118,9 @@ The hub reads `dashboard.json` on startup. Changes to tabs and widget instances 
   "version": 2,
   "satellites": [
     {
-      "id": "vikunja",
-      "url": "http://vikunja.station",
-      "widgetUrl": "http://vikunja-sat:8080"
+      "id": "inventory",
+      "url": "http://inventory.station",
+      "widgetUrl": "http://inventory:8080"
     }
   ],
   "tabs": [
@@ -129,16 +129,16 @@ The hub reads `dashboard.json` on startup. Changes to tabs and widget instances 
       "label": "Overview",
       "widgets": [
         {
-          "instanceId": "tasks-overview",
-          "widgetId": "vikunja.task-overview",
-          "satelliteId": "vikunja",
+          "instanceId": "inventory-main",
+          "widgetId": "inventory.overview",
+          "satelliteId": "inventory",
           "config": {}
         },
         {
-          "instanceId": "rc-tasks",
-          "widgetId": "vikunja.project-focus",
-          "satelliteId": "vikunja",
-          "config": { "project_id": 6 }
+          "instanceId": "robot-car-items",
+          "widgetId": "inventory.project-items",
+          "satelliteId": "inventory",
+          "config": { "project_slug": "robot-car" }
         }
       ]
     }
@@ -158,7 +158,7 @@ The hub reads `dashboard.json` on startup. Changes to tabs and widget instances 
 | `widgets[].satelliteId` | References a satellite entry above |
 | `widgets[].config` | Passed as `config` prop to the widget component |
 
-You can have **multiple instances of the same widget** with different configs — for example two `vikunja.project-focus` widgets on different tabs, each showing a different project.
+You can have **multiple instances of the same widget** with different configs — for example two `inventory.project-items` widgets on different tabs, each showing a different project.
 
 ---
 
@@ -172,8 +172,8 @@ import { lazy } from 'react'
 import type { WidgetManifest } from '@homeport/ui'
 import { ClockWidget } from '../widgets/builtin/ClockWidget'
 
-const TaskOverviewWidget = lazy(() => import('vikunja/TaskOverviewWidget'))
-const ProjectFocusWidget = lazy(() => import('vikunja/ProjectFocusWidget'))
+const InventoryOverviewWidget = lazy(() => import('inventory/InventoryOverviewWidget'))
+const ProjectItemsWidget      = lazy(() => import('inventory/ProjectItemsWidget'))
 
 export const registry: Record<string, WidgetManifest> = {
   'builtin.clock': {
@@ -184,23 +184,23 @@ export const registry: Record<string, WidgetManifest> = {
     component: ClockWidget,
     defaultIcon: 'clock',
   },
-  'vikunja.task-overview': {
-    id: 'vikunja.task-overview',
-    name: 'Tasks',
-    description: 'All open tasks with per-project pages',
+  'inventory.overview': {
+    id: 'inventory.overview',
+    name: 'Inventory',
+    description: 'Stock overview and per-project item needs',
     configSchema: {},
-    component: TaskOverviewWidget,
-    defaultIcon: 'check-square',
+    component: InventoryOverviewWidget,
+    defaultIcon: 'package',
   },
-  'vikunja.project-focus': {
-    id: 'vikunja.project-focus',
-    name: 'Project Focus',
-    description: 'Tasks for a single project',
+  'inventory.project-items': {
+    id: 'inventory.project-items',
+    name: 'Project Items',
+    description: 'Items assigned to one project',
     configSchema: {
-      project_id: { type: 'number', label: 'Project ID', required: true },
+      project_slug: { type: 'string', label: 'Project slug', required: true },
     },
-    component: ProjectFocusWidget,
-    defaultIcon: 'folder',
+    component: ProjectItemsWidget,
+    defaultIcon: 'package',
   },
 }
 ```
@@ -255,14 +255,14 @@ Widget IDs follow `<satellite>.<widget-name>` — all lowercase, hyphen-separate
 
 ```
 builtin.clock
-vikunja.task-overview
-vikunja.project-focus
 infra.overview
 inventory.overview
+inventory.project-items
 knowledge.reading
-fitness.overview
-budget.overview
+knowledge.project-tasks
+workspace.panel
 calendar.overview
+finance.overview
 ```
 
 ---
@@ -272,14 +272,12 @@ calendar.overview
 | Widget ID | Satellite | Description |
 |---|---|---|
 | `builtin.clock` | (none) | Current time |
-| `vikunja.task-overview` | `vikunja` | All tasks with per-project swipe pages |
-| `vikunja.project-focus` | `vikunja` | Tasks for one project (requires `project_id` in config) |
 | `infra.overview` | `infra` | Container status, CPU/RAM/disk |
 | `inventory.overview` | `inventory` | Stock overview and project needs |
+| `inventory.project-items` | `inventory` | Items assigned to one project (requires `project_slug` in config) |
 | `knowledge.reading` | `knowledge` | Currently reading books + Obsidian notes |
-| `fitness.overview` | `wger` | Workout status and nutrition log |
-| `budget.overview` | `budget` | Monthly spend vs. budgeted |
 | `calendar.overview` | `gcal` | Current calendar block with trade acknowledgment |
+| `finance.overview` | `finance` | Portfolio total value, cash, and holdings |
 
 ---
 

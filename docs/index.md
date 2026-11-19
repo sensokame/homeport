@@ -24,10 +24,10 @@ homeport is designed to run on a **wall-mounted panel** — a tablet in always-o
 | [Infrastructure](satellites/infra.md) | `homeport-infra` | Docker container monitoring — status, CPU, RAM, disk, actions |
 | [Inventory](satellites/inventory.md) | `homeport-inventory` | Equipment and project tracker with shopping list |
 | [Knowledge](satellites/knowledge.md) | `homeport-obsidian` | Currently-reading books (Goodreads) + active Obsidian notes |
-| [Tasks](satellites/vikunja.md) | `homeport-vikunja` | Vikunja wrapper — due today, overdue, project count |
-| [Fitness](satellites/wger.md) | `homeport-wger` | wger wrapper — workout schedule and nutrition logging |
-| [Budget](satellites/actual.md) | `homeport-actual` | Actual Budget wrapper — monthly spend vs. budgeted |
 | [Calendar](satellites/gcal.md) | `homeport-gcal` | ICS-based calendar — current block + trade acknowledgment |
+| [Workspace](satellites/workspace.md) | `homeport-workspace` | Composes other satellites' widgets into one card, per vault project |
+| [MCP Gateway](satellites/mcp-gateway.md) | `homeport-mcp-gateway` | Discovery + aggregation for the agent access layer |
+| [Finance](satellites/finance.md) | `homeport-finance` | Read-only brokerage portfolio overview (Scalable Capital CLI) |
 
 Each satellite ships a widget component loaded into the hub via module federation. See [Building a Satellite](satellites/building-a-satellite.md) to add your own.
 

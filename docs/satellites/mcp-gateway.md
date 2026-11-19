@@ -1,6 +1,6 @@
 # MCP Gateway Satellite
 
-UI-less* discovery and aggregation point for homeport's agent access layer. No domain data of its own — see [agent-integration.md](../../../Projects/projects/homeport/agent-integration.md) in the Projects vault for the full design.
+UI-less* discovery and aggregation point for homeport's agent access layer. No domain data of its own.
 
 *"UI-less" refers to the design's original intent (no agent-facing chat/interaction surface) — this satellite does have one small page: a live introspection view of what every satellite currently exposes, purely for observability, not for driving an agent.
 

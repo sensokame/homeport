@@ -19,10 +19,10 @@ docker pull ghcr.io/sensokame/homeport-hub:latest
 docker pull ghcr.io/sensokame/homeport-infra:latest
 docker pull ghcr.io/sensokame/homeport-inventory:latest
 docker pull ghcr.io/sensokame/homeport-obsidian:latest
-docker pull ghcr.io/sensokame/homeport-vikunja:latest
-docker pull ghcr.io/sensokame/homeport-wger:latest
-docker pull ghcr.io/sensokame/homeport-actual:latest
 docker pull ghcr.io/sensokame/homeport-gcal:latest
+docker pull ghcr.io/sensokame/homeport-workspace:latest
+docker pull ghcr.io/sensokame/homeport-mcp-gateway:latest
+docker pull ghcr.io/sensokame/homeport-finance:latest
 ```
 
 To build from source instead, see [Contributing](../contributing/index.md).
@@ -170,106 +170,6 @@ Add to `dashboard.json`:
 
 // widgets array in a tab
 { "instanceId": "knowledge-main", "widgetId": "knowledge.reading", "satelliteId": "knowledge", "config": {} }
-```
-
----
-
-### Tasks
-
-Requires a running [Vikunja](https://vikunja.io) instance on the same Docker network.
-
-```yaml
-services:
-  vikunja-sat:
-    image: ghcr.io/sensokame/homeport-vikunja:latest
-    container_name: vikunja-sat
-    restart: unless-stopped
-    environment:
-      - VIKUNJA_URL=http://vikunja:3456/api/v1
-      - VIKUNJA_TOKEN=your_token
-    networks:
-      - proxy-network
-
-networks:
-  proxy-network:
-    external: true
-```
-
-Add to `dashboard.json`:
-
-```json
-// satellites array
-{ "id": "vikunja", "url": "http://vikunja.station", "widgetUrl": "http://vikunja-sat:8080" }
-
-// widgets array in a tab
-{ "instanceId": "vikunja-main", "widgetId": "vikunja.task-overview", "satelliteId": "vikunja", "config": {} }
-```
-
----
-
-### Fitness
-
-Requires a running [wger](https://wger.de) instance on the same Docker network.
-
-```yaml
-services:
-  wger-sat:
-    image: ghcr.io/sensokame/homeport-wger:latest
-    container_name: wger-sat
-    restart: unless-stopped
-    environment:
-      - WGER_URL=http://wger/api/v2
-      - WGER_TOKEN=your_token
-    networks:
-      - proxy-network
-
-networks:
-  proxy-network:
-    external: true
-```
-
-Add to `dashboard.json`:
-
-```json
-// satellites array
-{ "id": "wger", "url": "http://wger.station", "widgetUrl": "http://wger-sat:8080" }
-
-// widgets array in a tab
-{ "instanceId": "wger-main", "widgetId": "fitness.overview", "satelliteId": "wger", "config": {} }
-```
-
----
-
-### Budget
-
-Requires a running [Actual Budget](https://actualbudget.org) server on the same Docker network.
-
-```yaml
-services:
-  actual-sat:
-    image: ghcr.io/sensokame/homeport-actual:latest
-    container_name: actual-sat
-    restart: unless-stopped
-    environment:
-      - ACTUAL_SERVER_URL=http://actual:5006
-      - ACTUAL_PASSWORD=your_password
-      - ACTUAL_BUDGET_ID=your_budget_id
-    networks:
-      - proxy-network
-
-networks:
-  proxy-network:
-    external: true
-```
-
-Add to `dashboard.json`:
-
-```json
-// satellites array
-{ "id": "budget", "url": "http://budget.station", "widgetUrl": "http://actual-sat:8080" }
-
-// widgets array in a tab
-{ "instanceId": "budget-main", "widgetId": "budget.overview", "satelliteId": "budget", "config": {} }
 ```
 
 ---

@@ -113,7 +113,7 @@ Renders a satellite widget: status dot, title, summary, metrics, and an "open â†
 <WidgetCard data={widgetData} url="http://infra.station" />
 ```
 
-`data` follows the [widget protocol](architecture.md#widget-protocol).
+`data` follows the [widget interfaces](../widgets/index.md#interfaces).
 
 ### LinkCard
 

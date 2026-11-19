@@ -13,10 +13,9 @@
        ├──────────────────► infra:8080
        ├──────────────────► inventory:8080
        ├──────────────────► knowledge:8080
-       ├──────────────────► vikunja-sat:8080
-       ├──────────────────► wger-sat:8080
-       ├──────────────────► actual-sat:8080
        ├──────────────────► gcal-sat:8080
+       ├──────────────────► workspace-sat:8080
+       ├──────────────────► finance:8080
        └──────────────────► (your satellite)
 ```
 
@@ -97,21 +96,15 @@ homeport/
 │   ├── obsidian/            Knowledge satellite
 │   │   ├── backend/         FastAPI — reads vault + Goodreads RSS
 │   │   └── Dockerfile
-│   ├── vikunja/             Tasks satellite
-│   │   ├── backend/         FastAPI — Vikunja API wrapper
+│   ├── gcal/                Calendar satellite
+│   │   ├── backend/         ICS parsing
 │   │   ├── src/             Widget components
 │   │   └── Dockerfile
-│   ├── wger/                Fitness satellite
-│   │   ├── backend/         FastAPI — wger API wrapper
-│   │   ├── src/             Widget components
-│   │   └── Dockerfile
-│   ├── actual/              Budget satellite
-│   │   ├── server/          Node.js + @actual-app/api
-│   │   ├── src/             React frontend + widget components
-│   │   └── Dockerfile
-│   └── gcal/                Calendar satellite
-│       ├── backend/         Node.js — ICS parsing
-│       ├── src/             Widget components
+│   ├── workspace/           Workspace satellite
+│   ├── mcp-gateway/         MCP gateway satellite
+│   └── finance/             Finance satellite
+│       ├── backend/         FastAPI — wraps the Scalable Capital CLI
+│       ├── src/             React frontend + widget component
 │       └── Dockerfile
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json

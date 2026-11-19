@@ -3,24 +3,6 @@ declare module '*.module.css' {
   export default classes
 }
 
-declare module 'vikunja/TaskOverviewWidget' {
-  import type { WidgetComponent } from '@homeport/ui'
-  const component: WidgetComponent
-  export default component
-}
-
-declare module 'vikunja/ProjectFocusWidget' {
-  import type { WidgetComponent } from '@homeport/ui'
-  const component: WidgetComponent
-  export default component
-}
-
-declare module 'budget/BudgetWidget' {
-  import type { WidgetComponent } from '@homeport/ui'
-  const component: WidgetComponent
-  export default component
-}
-
 declare module 'gcal/CalendarWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent
@@ -82,12 +64,6 @@ declare module 'workspace/WorkspacePanelWidget' {
 }
 
 declare module 'workspace/WorkspaceOverviewTeaserWidget' {
-  import type { WidgetComponent } from '@homeport/ui'
-  const component: WidgetComponent
-  export default component
-}
-
-declare module 'wger/FitnessWidget' {
   import type { WidgetComponent } from '@homeport/ui'
   const component: WidgetComponent
   export default component

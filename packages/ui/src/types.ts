@@ -2,7 +2,7 @@ import type { ComponentType, LazyExoticComponent, ReactNode } from 'react'
 
 export interface WidgetProps {
   config: Record<string, unknown>
-  satelliteUrl: string  // proxy base URL for API calls (e.g. /api/proxy/vikunja)
+  satelliteUrl: string  // proxy base URL for API calls (e.g. /api/proxy/inventory)
   publicUrl: string     // public URL for "open →" links
   /** Called by the widget when its status is determined; shell uses this to colour the card border. */
   onStatusChange?: (status: 'ok' | 'warn' | 'error') => void

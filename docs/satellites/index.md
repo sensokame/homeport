@@ -10,12 +10,7 @@ Satellites are the services homeport aggregates. Each is a standalone Docker con
 - **[Knowledge](knowledge.md)** — currently-reading books (Goodreads) + active Obsidian notes + per-project tasks/notes
 - **[Workspace](workspace.md)** — composes widgets from other satellites into one card, manually or auto-discovered per vault project
 - **[MCP Gateway](mcp-gateway.md)** — discovery + aggregation for homeport's agent access layer; no domain data of its own
-
-Present in the monorepo but not currently deployed (source kept for possible reinstatement — see the homeport project's task history for why each was removed):
-
-- **[Tasks](vikunja.md)** — Vikunja wrapper; due today, overdue, project count
-- **[Fitness](wger.md)** — wger wrapper; workout schedule and nutrition logging
-- **[Budget](actual.md)** — Actual Budget wrapper; monthly spend vs. budgeted
+- **[Finance](finance.md)** — read-only brokerage portfolio overview via the Scalable Capital CLI
 
 ---
 

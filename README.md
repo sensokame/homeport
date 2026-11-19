@@ -19,11 +19,9 @@ The hub reads `dashboard.json` and renders a configurable tab dashboard. Each sa
 | `apps/inventory` | Inventory satellite — equipment tracker with shopping list + per-project item assignments |
 | `apps/obsidian` | Knowledge satellite — currently-reading books (Goodreads) + active Obsidian notes + per-project tasks |
 | `apps/workspace` | Workspace satellite — composes other satellites' widgets into one card, manually or per vault project |
-| `apps/vikunja` | Tasks satellite — wraps Vikunja; shows due today and overdue |
-| `apps/wger` | Fitness satellite — wraps wger; shows workout and nutrition status |
-| `apps/actual` | Budget satellite — wraps Actual Budget; shows monthly spend summary |
 | `apps/gcal` | Calendar satellite — ICS-based calendar; current block + trade acknowledgment |
 | `apps/mcp-gateway` | MCP Gateway satellite — discovery + aggregation for the agent access layer (no domain data of its own) |
+| `apps/finance` | Finance satellite — read-only brokerage portfolio overview via the Scalable Capital CLI |
 
 ## Packages
 

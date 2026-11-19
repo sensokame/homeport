@@ -12,17 +12,17 @@ Mount this file into the container. Edit it without rebuilding. Changes to tabs 
 {
   "version": 2,
   "satellites": [
-    { "id": "infra",   "url": "http://infra.station",   "widgetUrl": "http://infra:8080" },
-    { "id": "vikunja", "url": "http://vikunja.station", "widgetUrl": "http://vikunja-sat:8080" }
+    { "id": "infra",     "url": "http://infra.station",     "widgetUrl": "http://infra:8080" },
+    { "id": "inventory", "url": "http://inventory.station", "widgetUrl": "http://inventory:8080" }
   ],
   "tabs": [
     {
       "id": "overview",
       "label": "Overview",
       "widgets": [
-        { "instanceId": "infra-main",   "widgetId": "infra.overview",         "satelliteId": "infra",   "config": {} },
-        { "instanceId": "vikunja-main", "widgetId": "vikunja.task-overview",  "satelliteId": "vikunja", "config": {} },
-        { "instanceId": "rc-focus",     "widgetId": "vikunja.project-focus",  "satelliteId": "vikunja", "config": { "project_id": 6 } }
+        { "instanceId": "infra-main",      "widgetId": "infra.overview",          "satelliteId": "infra",     "config": {} },
+        { "instanceId": "inventory-main",  "widgetId": "inventory.overview",      "satelliteId": "inventory", "config": {} },
+        { "instanceId": "robot-car-items", "widgetId": "inventory.project-items", "satelliteId": "inventory", "config": { "project_slug": "robot-car" } }
       ]
     }
   ]
