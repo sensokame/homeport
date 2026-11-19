@@ -55,7 +55,7 @@ def catalog():
     return {
         "widgets": [
             {"id": "finance.overview", "name": "Finance",
-             "description": "Portfolio overview and trade proposals",
+             "description": "Portfolio overview",
              "configSchema": {}},
         ],
     }
