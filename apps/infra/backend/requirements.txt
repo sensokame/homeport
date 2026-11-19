@@ -1,5 +1,5 @@
-fastapi==0.121.0
-uvicorn==0.32.0
+fastapi==0.165.0
+uvicorn==0.54.0
 docker==7.1.0
 psutil==6.0.0
 mcp==1.28.1

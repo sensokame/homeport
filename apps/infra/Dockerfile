@@ -9,6 +9,8 @@ RUN pnpm --filter @homeport/infra build
 
 FROM python:3.11-slim
 WORKDIR /app
+# Pick up Debian security fixes newer than the base image.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
@@ -18,7 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*
 COPY apps/infra/backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# setuptools/wheel are build-time only and carry vendored packages with known CVEs.
+RUN pip install --no-cache-dir -r requirements.txt && pip uninstall -y setuptools wheel
 COPY apps/infra/backend/ .
 COPY --from=builder /repo/apps/infra/dist ./static
 EXPOSE 8080

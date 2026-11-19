@@ -12,6 +12,8 @@ RUN pnpm --filter @homeport/knowledge build
 
 FROM python:3.11-slim
 WORKDIR /app
+# Pick up Debian security fixes newer than the base image.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
@@ -22,7 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/obsidian/backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# setuptools/wheel are build-time only and carry vendored packages with known CVEs.
+RUN pip install --no-cache-dir -r requirements.txt && pip uninstall -y setuptools wheel
 
 COPY apps/obsidian/backend/ .
 COPY --from=builder /repo/apps/obsidian/dist ./static

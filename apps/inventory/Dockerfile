@@ -14,9 +14,12 @@ RUN pnpm --filter @homeport/inventory build
 # Stage 2: Python runtime
 FROM python:3.11-slim
 WORKDIR /app
+# Pick up Debian security fixes newer than the base image.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 COPY apps/inventory/backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# setuptools/wheel are build-time only and carry vendored packages with known CVEs.
+RUN pip install --no-cache-dir -r requirements.txt && pip uninstall -y setuptools wheel
 
 COPY apps/inventory/backend/ .
 COPY --from=builder /repo/apps/inventory/dist ./static

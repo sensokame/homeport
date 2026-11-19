@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-httpx
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
 icalendar
 recurring-ical-events
 mcp==1.28.1
